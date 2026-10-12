@@ -1,3 +1,5 @@
+import { requireGateway } from "@/lib/gateway";
+import { headers as requestHeaders } from "next/headers";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 import { NextResponse, type NextRequest } from "next/server";
@@ -9,10 +11,7 @@ import {
   CHUNK_SIZE,
 } from "@/lib/storage";
 import { z } from "zod";
-function origin(req: NextRequest) {
-  if (req.headers.get("origin") !== req.nextUrl.origin)
-    throw Error("Invalid request origin");
-}
+function origin(req: NextRequest) { requireGateway(req.headers); }
 function error(e: unknown) {
   return NextResponse.json(
     { error: e instanceof Error ? e.message : "Upload failed" },
@@ -20,6 +19,7 @@ function error(e: unknown) {
   );
 }
 export async function POST(req: NextRequest) {
+  try { requireGateway(req.headers); } catch { return NextResponse.json({ error: "Unauthorized" }, { status: 401 }); }
   try {
     origin(req);
     const { token } = await context();
@@ -39,6 +39,7 @@ export async function POST(req: NextRequest) {
   }
 }
 export async function PUT(req: NextRequest) {
+  try { requireGateway(req.headers); } catch { return NextResponse.json({ error: "Unauthorized" }, { status: 401 }); }
   try {
     origin(req);
     const { token } = await context();

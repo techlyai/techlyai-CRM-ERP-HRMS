@@ -1,3 +1,5 @@
+import { requireGateway } from "@/lib/gateway";
+import { headers as requestHeaders } from "next/headers";
 export const dynamic = "force-dynamic";
 import { NextResponse, type NextRequest } from "next/server";
 import { context } from "@/lib/database";
@@ -5,9 +7,9 @@ import { parseCSV } from "@/lib/domain";
 import { parseXlsx } from "@/lib/reports";
 import { validateRecord } from "@/lib/modules";
 export async function POST(req: NextRequest) {
+  try { requireGateway(req.headers); } catch { return NextResponse.json({ error: "Unauthorized" }, { status: 401 }); }
   try {
-    if (req.headers.get("origin") !== req.nextUrl.origin)
-      throw Error("Invalid origin");
+    requireGateway(req.headers);
     const { db, profile } = await context();
     const f = await req.formData();
     const file = f.get("file");

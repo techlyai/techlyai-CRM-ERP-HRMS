@@ -1,4 +1,5 @@
 "use server";
+import { requireGateway } from "./gateway";
 import { context, serviceDB, setSession } from "./database";
 import {
   authenticate,
@@ -40,6 +41,7 @@ export async function login(input: {
   phone: string;
   password: string;
 }): Promise<Result> {
+  requireGateway(headers());
   return safely(async () => {
     z.string().min(1).max(200).parse(input.password);
     const phone = normalizePhone(input.phone);
@@ -63,12 +65,14 @@ export async function login(input: {
   });
 }
 export async function logout() {
+  requireGateway(headers());
   const token = cookies().get("techly-session")?.value;
   if (token) await revokeSession(token);
   cookies().delete("techly-session");
   redirect("/login");
 }
 export async function changePassword(password: string): Promise<Result> {
+  requireGateway(headers());
   return safely(async () => {
     z.string()
       .min(12)
@@ -92,6 +96,7 @@ export async function saveRecord(input: {
   version?: number;
   status?: string;
 }): Promise<Result> {
+  requireGateway(headers());
   return safely(async () => {
     const { db, profile } = await context();
     const data = validateRecord(input.module, input.data);
@@ -121,6 +126,7 @@ export async function recordAction(input: {
   expiry?: string;
   until?: string;
 }): Promise<Result> {
+  requireGateway(headers());
   return safely(async () => {
     const { db } = await context();
     const id = uuid.parse(input.id);
@@ -186,6 +192,7 @@ export async function clock(input: {
   accuracy?: number;
   wfh?: boolean;
 }): Promise<Result> {
+  requireGateway(headers());
   return safely(async () => {
     const { db } = await context();
     z.enum(["in", "out"]).parse(input.action);
@@ -211,6 +218,7 @@ export async function addQuestion(
   body: string,
   parent?: string,
 ): Promise<Result> {
+  requireGateway(headers());
   return safely(async () => {
     const { db } = await context();
     const id = await db.rpc<string>("record_question", {
@@ -226,6 +234,7 @@ export async function resolveQuestion(
   id: string,
   resolved: boolean,
 ): Promise<Result> {
+  requireGateway(headers());
   return safely(async () => {
     const { db } = await context();
     await db.rpc("resolve_question", {
@@ -245,6 +254,7 @@ export async function stockMovement(input: {
   note: string;
   key: string;
 }): Promise<Result> {
+  requireGateway(headers());
   return safely(async () => {
     const { db } = await context();
     await db.rpc("stock_transaction", {
@@ -281,6 +291,7 @@ export async function payment(input: {
   reference: string;
   key: string;
 }): Promise<Result> {
+  requireGateway(headers());
   return safely(async () => {
     const { db } = await context();
     await db.rpc("record_payment", {
@@ -295,6 +306,7 @@ export async function payment(input: {
   });
 }
 export async function markRead(ids: string[]): Promise<Result> {
+  requireGateway(headers());
   return safely(async () => {
     const { db } = await context();
     await db.rpc("read_notifications", {
@@ -305,6 +317,7 @@ export async function markRead(ids: string[]): Promise<Result> {
   });
 }
 export async function savePreferences(data: unknown): Promise<Result> {
+  requireGateway(headers());
   return safely(async () => {
     const { db } = await context();
     const valid = z
@@ -327,6 +340,7 @@ export async function savePreferences(data: unknown): Promise<Result> {
   });
 }
 export async function subscribePush(subscription: unknown): Promise<Result> {
+  requireGateway(headers());
   return safely(async () => {
     const { db } = await context();
     const s = z
@@ -352,6 +366,7 @@ export async function subscribePush(subscription: unknown): Promise<Result> {
   });
 }
 export async function saveSettings(data: unknown): Promise<Result> {
+  requireGateway(headers());
   return safely(async () => {
     const { db, profile } = await context();
     if (profile.role !== "super_admin") throw Error("Permission denied");
@@ -409,6 +424,7 @@ export async function setPermission(input: {
   action: string;
   scope: string;
 }): Promise<Result> {
+  requireGateway(headers());
   return safely(async () => {
     const { db } = await context();
     if (!moduleMap[input.module]) throw Error("Invalid module");
@@ -435,6 +451,7 @@ export async function updateProfile(input: {
   role: string;
   active: boolean;
 }): Promise<Result> {
+  requireGateway(headers());
   return safely(async () => {
     const { db } = await context();
     await db.rpc("set_profile", {
@@ -456,6 +473,7 @@ export async function createUser(input: {
   department?: string;
   manager?: string;
 }): Promise<Result> {
+  requireGateway(headers());
   return safely(async () => {
     const { profile, token } = await context();
     if (profile.role !== "super_admin") throw Error("Permission denied");
@@ -484,6 +502,7 @@ export async function verifyAttachment(
   id: string,
   verified: boolean,
 ): Promise<Result> {
+  requireGateway(headers());
   return safely(async () => {
     const { db } = await context();
     await db.rpc("verify_document", {
@@ -498,6 +517,7 @@ export async function shareRecord(
   record: string,
   user: string,
 ): Promise<Result> {
+  requireGateway(headers());
   return safely(async () => {
     const { db } = await context();
     await db.rpc("share_record", {
@@ -512,6 +532,7 @@ export async function archiveRecord(
   id: string,
   version: number,
 ): Promise<Result> {
+  requireGateway(headers());
   return safely(async () => {
     const { db } = await context();
     await db.rpc("delete_record", {
@@ -523,6 +544,7 @@ export async function archiveRecord(
   });
 }
 export async function markQuestionsRead(id: string): Promise<Result> {
+  requireGateway(headers());
   return safely(async () => {
     const { db } = await context();
     await db.rpc("read_questions", { p_record: uuid.parse(id) });
@@ -536,6 +558,7 @@ export async function grantLeave(input: {
   reason: string;
   key: string;
 }): Promise<Result> {
+  requireGateway(headers());
   return safely(async () => {
     const { db } = await context();
     await db.rpc("grant_leave", {

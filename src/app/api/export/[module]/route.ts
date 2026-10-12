@@ -1,3 +1,5 @@
+import { requireGateway } from "@/lib/gateway";
+import { headers as requestHeaders } from "next/headers";
 export const dynamic = "force-dynamic";
 import { type NextRequest, NextResponse } from "next/server";
 import { context } from "@/lib/database";
@@ -9,6 +11,7 @@ export async function GET(
   req: NextRequest,
   { params }: { params: { module: string } },
 ) {
+  try { requireGateway(req.headers); } catch { return NextResponse.json({ error: "Unauthorized" }, { status: 401 }); }
   try {
     const m = moduleMap[params.module];
     if (!m) throw Error("Unknown module");

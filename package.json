@@ -1,36 +1,23 @@
 {
-  "name": "techly-platform",
+  "name": "techly-backend",
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "next dev -H 127.0.0.1",
+    "dev": "next dev -H 127.0.0.1 -p 3001",
     "build": "next build",
-    "start": "next start -H 127.0.0.1",
+    "start": "next start -H 0.0.0.0",
     "typecheck": "tsc --noEmit",
     "test": "node scripts/run-ts.cjs tests/run.ts",
-    "create-admin": "node --env-file=.env.local scripts/run-ts.cjs scripts/create-admin.ts",
-    "db:verify": "node --env-file=.env.database scripts/run-ts.cjs scripts/verify-database.ts",
-    "db:contracts": "node scripts/run-ts.cjs scripts/generate-contracts.ts",
-    "db:start": "powershell -NoProfile -File scripts/local-postgres.ps1 start",
-    "db:stop": "powershell -NoProfile -File scripts/local-postgres.ps1 stop",
-    "db:setup": "node --env-file=.env.database scripts/run-ts.cjs scripts/setup-database.ts",
-    "db:docker:prepare": "powershell -NoProfile -File scripts/docker-postgres.ps1 prepare",
-    "db:docker:start": "powershell -NoProfile -File scripts/docker-postgres.ps1 start",
-    "db:docker:stop": "powershell -NoProfile -File scripts/docker-postgres.ps1 stop",
-    "db:docker:status": "powershell -NoProfile -File scripts/docker-postgres.ps1 status"
+    "create-admin": "node --env-file-if-exists=.env.local scripts/run-ts.cjs scripts/create-admin.ts",
+    "db:setup": "node --env-file-if-exists=.env.database scripts/run-ts.cjs scripts/setup-database.ts",
+    "db:verify": "node --env-file-if-exists=.env.database scripts/run-ts.cjs scripts/verify-database.ts",
+    "db:contracts": "node scripts/run-ts.cjs scripts/generate-contracts.ts"
   },
   "dependencies": {
     "next": "14.2.35",
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "zod": "3.25.76",
-    "lucide-react": "0.468.0",
-    "clsx": "2.1.1",
-    "tailwind-merge": "2.6.1",
-    "class-variance-authority": "0.7.1",
-    "@radix-ui/react-dialog": "1.1.15",
-    "@radix-ui/react-slot": "1.2.3",
-    "framer-motion": "11.18.2",
     "web-push": "3.6.7",
     "docx": "9.8.1",
     "fflate": "0.8.2",
@@ -46,8 +33,10 @@
     "tailwindcss": "3.4.18",
     "postcss": "8.5.6",
     "autoprefixer": "10.4.21",
-    "tsx": "4.21.0",
     "prettier": "3.6.2",
     "@types/pg": "8.23.1"
+  },
+  "engines": {
+    "node": ">=22.18.0 <23"
   }
 }

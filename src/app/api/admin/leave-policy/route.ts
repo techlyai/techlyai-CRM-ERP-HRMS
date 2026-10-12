@@ -1,11 +1,13 @@
+import { requireGateway } from "@/lib/gateway";
+import { headers as requestHeaders } from "next/headers";
 export const dynamic = "force-dynamic";
 import { NextResponse, type NextRequest } from "next/server";
 import { context } from "@/lib/database";
 import { z } from "zod";
 export async function POST(req: NextRequest) {
+  try { requireGateway(req.headers); } catch { return NextResponse.json({ error: "Unauthorized" }, { status: 401 }); }
   try {
-    if (req.headers.get("origin") !== req.nextUrl.origin)
-      throw Error("Invalid origin");
+    requireGateway(req.headers);
     const { db, profile } = await context();
     if (profile.role !== "super_admin") throw Error("Permission denied");
     const p = z
