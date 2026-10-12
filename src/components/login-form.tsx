@@ -1,0 +1,120 @@
+"use client";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { ArrowRight, Eye, EyeOff, Loader2 } from "lucide-react";
+import { login, changePassword } from "@/lib/actions";
+import { Button } from "./ui/button";
+export function LoginForm({
+  configured,
+  change = false,
+}: {
+  configured: boolean;
+  change?: boolean;
+}) {
+  const router = useRouter();
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [show, setShow] = useState(false);
+  return (
+    <form
+      method="post"
+      className="mt-8 space-y-5"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        setError("");
+        setBusy(true);
+        const data = new FormData(e.currentTarget);
+        const password = String(data.get("password"));
+        if (change && password !== data.get("confirm")) {
+          setError("Passwords do not match");
+          setBusy(false);
+          return;
+        }
+        const result = change
+          ? await changePassword(password)
+          : await login({ phone: String(data.get("phone")), password });
+        setBusy(false);
+        if (!result.ok) setError(result.error || "Sign-in failed");
+        else {
+          router.push("/");
+          router.refresh();
+        }
+      }}
+    >
+      {!change && (
+        <div>
+          <label htmlFor="phone">Phone number</label>
+          <input
+            id="phone"
+            name="phone"
+            type="tel"
+            autoComplete="username"
+            placeholder="+91 98765 43210"
+            required
+            disabled={!configured}
+          />
+        </div>
+      )}
+      <div>
+        <label htmlFor="password">{change ? "New password" : "Password"}</label>
+        <div className="relative">
+          <input
+            id="password"
+            name="password"
+            type={show ? "text" : "password"}
+            autoComplete={change ? "new-password" : "current-password"}
+            placeholder={
+              change ? "At least 12 characters" : "Enter your password"
+            }
+            required
+            minLength={change ? 12 : 1}
+            disabled={!configured}
+            className="pr-12"
+          />
+          <button
+            type="button"
+            onClick={() => setShow(!show)}
+            aria-label={show ? "Hide password" : "Show password"}
+            className="absolute right-3 top-3 text-muted-foreground"
+          >
+            {show ? <EyeOff size={17} /> : <Eye size={17} />}
+          </button>
+        </div>
+      </div>
+      {change && (
+        <>
+          <p className="text-xs text-muted-foreground">
+            Use at least 12 characters with uppercase and lowercase letters and
+            a number.
+          </p>
+          <div>
+            <label htmlFor="confirm">Confirm new password</label>
+            <input
+              id="confirm"
+              name="confirm"
+              type="password"
+              autoComplete="new-password"
+              minLength={12}
+              required
+            />
+          </div>
+        </>
+      )}
+      {error && (
+        <p role="alert" className="error">
+          {error}
+        </p>
+      )}
+      <Button type="submit" className="w-full" disabled={busy || !configured}>
+        {busy ? <Loader2 size={16} className="animate-spin" /> : null}
+        {change ? "Set password & continue" : "Sign in to your workspace"}
+        <ArrowRight size={16} />
+      </Button>
+      <p className="text-center text-xs text-muted-foreground">
+        {change
+          ? "Your temporary password must be changed before continuing."
+          : "Need access? Contact your Techly administrator."}
+      </p>
+    </form>
+  );
+}
