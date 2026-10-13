@@ -22,11 +22,11 @@ export function Status({ value }: { value: string }) {
     "Cancellation Requested",
   ];
   const cls = good.includes(value)
-    ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+    ? "bg-success/10 text-success"
     : bad.includes(value)
-      ? "bg-rose-500/10 text-rose-600 dark:text-rose-400"
+      ? "bg-danger/10 text-danger"
       : pending.includes(value)
-        ? "bg-amber-500/10 text-amber-700 dark:text-amber-400"
+        ? "bg-warning/10 text-warning"
         : "bg-muted text-muted-foreground";
   return (
     <span

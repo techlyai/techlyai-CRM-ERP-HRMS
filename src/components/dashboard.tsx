@@ -22,6 +22,7 @@ import { money } from "@/lib/domain";
 import { Status } from "./ui/status";
 import { Button } from "./ui/button";
 import { OperationsSnapshot } from "./operations-snapshot";
+import { LogoMark } from "./logo";
 export type Stats = {
   counts: Record<string, number>;
   employees: number;
@@ -143,8 +144,8 @@ export function Dashboard({
             Overview
           </p>
           <h1 className="text-[28px] font-semibold tracking-tight">
-            Hello, {profile.full_name.split(" ")[0]}{" "}
-            <span className="text-2xl">✦</span>
+            Hello, {profile.full_name.split(" ")[0]}
+
           </h1>
           <p className="mt-2 text-[13px] text-muted-foreground">
             Here’s what’s happening across your workspace today.
@@ -168,10 +169,10 @@ export function Dashboard({
           .filter((c) => visible.includes(c.module))
           .map((c, i) => {
             const colour: Record<string, string> = {
-              violet: "bg-violet-500/10 text-violet-600",
-              blue: "bg-blue-500/10 text-blue-600",
-              emerald: "bg-emerald-500/10 text-emerald-600",
-              amber: "bg-amber-500/10 text-amber-600",
+              violet: "bg-primary/10 text-primary",
+              blue: "bg-accent/10 text-accent",
+              emerald: "bg-success/10 text-success",
+              amber: "bg-warning/10 text-warning",
             };
             return (
               <motion.div
@@ -206,7 +207,7 @@ export function Dashboard({
             );
           })}
       </div>
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-violet-500/15 bg-gradient-to-r from-violet-500/10 to-indigo-500/5 p-5">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-primary/15 bg-gradient-to-r from-primary/10 to-accent/5 p-5">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-card text-primary">
             <AlertCircle size={20} />
@@ -270,7 +271,7 @@ export function Dashboard({
                   >
                     <div
                       title={money(bar.amount)}
-                      className={`w-full max-w-12 rounded-t-md ${i === 5 ? "bg-primary" : "bg-violet-500/15"}`}
+                      className={`w-full max-w-12 rounded-t-md ${i === 5 ? "bg-primary" : "bg-primary/15"}`}
                       style={{
                         height: `${Math.max(2, (Number(bar.amount) / max) * 85)}%`,
                       }}
@@ -366,7 +367,7 @@ export function Dashboard({
                     key={r.id}
                     className="flex items-start gap-3"
                   >
-                    <span className="mt-1 flex h-8 w-8 items-center justify-center rounded-full bg-violet-500/10 text-primary">
+                    <span className="mt-1 flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary">
                       <FileText size={14} />
                     </span>
                     <div className="flex-1">
@@ -434,7 +435,7 @@ export function Dashboard({
               {admin ? "Authorized team overview" : "Your attendance status"}
             </p>
             <div className="my-5 flex items-center justify-center">
-              <div className="flex h-32 w-32 flex-col items-center justify-center rounded-full border-[12px] border-violet-500/15">
+              <div className="flex h-32 w-32 flex-col items-center justify-center rounded-full border-[12px] border-primary/15">
                 <span className="text-3xl font-semibold">
                   {Object.values(stats.attendance).reduce(
                     (a, b) => a + Number(b),
@@ -454,7 +455,7 @@ export function Dashboard({
                 >
                   <span className="flex items-center gap-2 text-muted-foreground">
                     <span
-                      className={`h-2 w-2 rounded-full ${["bg-primary", "bg-amber-400", "bg-blue-400", "bg-rose-400"][i]}`}
+                      className={`h-2 w-2 rounded-full ${["bg-primary", "bg-warning", "bg-accent", "bg-danger"][i]}`}
                     />
                     {s}
                   </span>
@@ -471,18 +472,18 @@ export function Dashboard({
               </Link>
             </Button>
           </section>
-          <section className="rounded-xl bg-[#211738] p-5 text-white">
-            <span className="mb-4 block text-xl text-violet-300">✦</span>
+          <section className="rounded-xl bg-navy p-5 text-navy-foreground">
+            <LogoMark size={16} tone="dark" className="mb-4" />
             <h2 className="text-base font-semibold">
               A little clarity goes a long way.
             </h2>
-            <p className="mt-2 text-xs leading-6 text-violet-200/70">
+            <p className="mt-2 text-xs leading-6 text-navy-foreground/70">
               Close the loop on today’s work. Submit your daily report and keep
               your team in sync.
             </p>
             <Link
               href="/modules/eod?new=1"
-              className="mt-4 inline-flex items-center gap-2 text-xs font-medium text-violet-200"
+              className="mt-4 inline-flex items-center gap-2 text-xs font-medium text-navy-foreground"
             >
               Write your daily report
               <ArrowUpRight size={14} />

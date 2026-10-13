@@ -575,7 +575,7 @@ export function RecordDetails({
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="ml-2 mt-4 text-rose-600"
+                    className="ml-2 mt-4 text-danger"
                     onClick={() => open("archive")}
                   >
                     Archive record
