@@ -1,31 +1,28 @@
-# Service split validation
+# Complete backend-branch deployment validation
 
-Validated locally on Node.js 22 against the local Docker PostgreSQL database:
+The `backend` deployment source contains the full website, APIs, PostgreSQL schema
+and reminder worker, with one root Compose file.
 
-- Both Next.js production builds and TypeScript checks pass.
-- Backend domain, password, query and file-response tests: 14 pass.
-- Transactional PostgreSQL RLS/business-workflow integration tests pass.
-- Two running production services pass HTTP checks for service-key enforcement,
-  frontend login/session cookies, forced password change, admin server rendering,
-  lead creation, cross-user record isolation, the read-RPC allowlist, upload origin
-  validation, private file upload/download, cross-user file denial and logout.
-- Both dependency locks are normalized with npm; `npm ci --dry-run --offline`
-  validates package/lock consistency. Native Docker image builds and production
-  deployment were not run in this restricted session.
+Completed for this revision:
 
-The HTTP test creates random test users and records and removes those fixtures
-afterward. To rerun using a disposable local database, start backend on port 3101
-and frontend on port 3100. Set their shared `TECHLY_INTERNAL_API_KEY` and set
-frontend `APP_URL=http://127.0.0.1:3100`, `BACKEND_URL=http://127.0.0.1:3101`.
-In the backend checkout, set `DATABASE_ADMIN_URL` for that test database,
-`TECHLY_INTERNAL_API_KEY`, and `TEST_FRONTEND_BUILD_DIR` to the frontend `.next`
-directory, then run:
+- Next.js production build, including login, workspace pages and all API routes.
+- TypeScript validation and 15 domain, report, password, query, file and origin tests.
+- `docker compose -f docker-compose.yml config --quiet` with test environment values.
+- `npm ci --dry-run --offline` validates the combined package and dependency lock.
+- Earlier local PostgreSQL RLS/workflow integration checks passed; this revision
+  does not change the SQL schema.
+
+The new live HTTP login smoke check could not run: automatic approval review
+blocked starting its local server because sandbox approval is disabled. The
+script is included as `scripts/smoke-complete.ts`; it uses disposable test users
+against a local test database and removes them afterward. Set `DATABASE_ADMIN_URL`
+and `TEST_BUILD_DIR` pointing to the built app's `.next` folder; run the app on
+127.0.0.1:3102 with its runtime database connection, then execute:
 
 ```sh
-node scripts/run-ts.cjs scripts/smoke-split.ts
+node scripts/run-ts.cjs scripts/smoke-complete.ts
 ```
 
-Production domain routing, fresh-cluster migration in Docker, browser push with
-real VAPID keys, device geolocation and visual/mobile browser checks still need
-verification in the deployment environment. This validation describes the service
-split; it does not certify completion of every feature in the original product brief.
+Docker image execution, fresh-cluster installation, HTTPS domain routing and live
+browser push remain to be checked on Dokploy. See [DOKPLOY.md](DOKPLOY.md) for the
+deployment steps and [STATUS.md](STATUS.md) for remaining product feature work.

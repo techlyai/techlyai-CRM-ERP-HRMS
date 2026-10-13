@@ -1,3 +1,9 @@
-# Service branches
+# Backend is the complete deployment branch
 
-This is the **backend** service. The two branches contain different application code and deploy independently. Shared domain definitions are duplicated intentionally and must be kept compatible. Read [DOKPLOY.md](DOKPLOY.md) for connections, credentials, and deployment.
+Deploy only `backend`. It contains the full Next.js application: frontend pages,
+components, styles, backend APIs, authentication, PostgreSQL schema, files,
+reports, and scheduled jobs. Its root `docker-compose.yml` starts the entire
+platform in one Dokploy application. The `frontend` branch is not a dependency.
+
+Follow [DOKPLOY.md](DOKPLOY.md) for environment variables, the domain, and login.
+Do not use the earlier instructions for separately deploying the two branches.

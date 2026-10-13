@@ -80,7 +80,7 @@ export async function context(allowPasswordChange = false) {
 }
 export async function setSession(token: string) {
   const appURL = new URL(
-    process.env.APP_URL || "http://localhost:3000",
+    process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
   );
   if (
     process.env.NODE_ENV === "production" &&

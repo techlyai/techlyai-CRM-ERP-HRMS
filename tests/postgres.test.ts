@@ -4,6 +4,28 @@ import { hashPassword, verifyPassword, tokenHash } from "../src/lib/passwords";
 import { selectQuery } from "../src/lib/query";
 import { fileResponse } from "../src/lib/file-response";
 import { NextRequest } from "next/server";
+import { requireSameOrigin } from "../src/lib/request-origin";
+
+test("public origin validation works behind HTTPS proxy without trusting forwarded headers", () => {
+  const previous = process.env.APP_URL;
+  try {
+    process.env.APP_URL = "https://crm.example.com";
+    assert.doesNotThrow(() => requireSameOrigin(new NextRequest("http://backend:3000/api/uploads", {
+      headers: { origin: "https://crm.example.com" },
+    })));
+    assert.throws(() => requireSameOrigin(new NextRequest("http://backend:3000/api/uploads", {
+      headers: { origin: "https://attacker.example", "x-forwarded-host": "attacker.example" },
+    })));
+    assert.throws(() => requireSameOrigin(new NextRequest("http://backend:3000/api/uploads")));
+    delete process.env.APP_URL;
+    assert.doesNotThrow(() => requireSameOrigin(new NextRequest("http://localhost:3000/api/uploads", {
+      headers: { origin: "http://localhost:3000" },
+    })));
+  } finally {
+    if (previous === undefined) delete process.env.APP_URL;
+    else process.env.APP_URL = previous;
+  }
+});
 
 test("passwords use individual salts and reject wrong or malformed credentials", async () => {
   const password = "A-long-unique-passphrase-91!";

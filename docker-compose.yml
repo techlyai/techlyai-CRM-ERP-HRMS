@@ -1,3 +1,11 @@
+# One Dokploy application, using only the backend Git branch.
+# The backend service serves BOTH the web interface and its API.
+x-techly-build: &techly-build
+  context: .
+  args:
+    NEXT_PUBLIC_DEFAULT_COUNTRY_CODE: ${NEXT_PUBLIC_DEFAULT_COUNTRY_CODE:-91}
+    NEXT_PUBLIC_VAPID_PUBLIC_KEY: ${NEXT_PUBLIC_VAPID_PUBLIC_KEY:-}
+
 services:
   postgres:
     image: postgres:18-bookworm
@@ -15,10 +23,7 @@ services:
       retries: 20
 
   migrate:
-    build:
-      context: .
-      args:
-        NEXT_PUBLIC_VAPID_PUBLIC_KEY: ${NEXT_PUBLIC_VAPID_PUBLIC_KEY:-}
+    build: *techly-build
     restart: "no"
     environment:
       DATABASE_ADMIN_URL: postgresql://techly_owner:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgres:5432/techly
@@ -30,16 +35,12 @@ services:
         condition: service_healthy
 
   backend:
-    build:
-      context: .
-      args:
-        NEXT_PUBLIC_VAPID_PUBLIC_KEY: ${NEXT_PUBLIC_VAPID_PUBLIC_KEY:-}
+    build: *techly-build
     restart: unless-stopped
     expose: ["3000"]
     environment:
       DATABASE_URL: postgresql://techly_app:${DATABASE_APP_PASSWORD:?Set DATABASE_APP_PASSWORD}@postgres:5432/techly
-      APP_URL: ${APP_URL:?Set APP_URL to the frontend HTTPS origin}
-      TECHLY_INTERNAL_API_KEY: ${TECHLY_INTERNAL_API_KEY:?Set the shared service secret}
+      APP_URL: ${APP_URL:?Set APP_URL to the public HTTPS origin}
       CRON_SECRET: ${CRON_SECRET:?Set a separate cron secret}
       NEXT_PUBLIC_VAPID_PUBLIC_KEY: ${NEXT_PUBLIC_VAPID_PUBLIC_KEY:-}
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
@@ -55,7 +56,7 @@ services:
     security_opt: ["no-new-privileges:true"]
 
   scheduler:
-    build: .
+    build: *techly-build
     restart: unless-stopped
     command: ["node", "scripts/scheduler.cjs"]
     environment:
