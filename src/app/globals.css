@@ -1,52 +1,114 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Techly design tokens. Every colour in the app derives from these. */
 :root {
-  --background: 228 33% 98%;
-  --foreground: 225 30% 15%;
+  --background: 210 40% 98%;
+  --foreground: 222 47% 11%;
   --card: 0 0% 100%;
-  --border: 225 24% 92%;
-  --primary: 258 83% 61%;
-  --muted: 225 30% 96%;
-  --muted-foreground: 224 13% 47%;
+  --card-foreground: 222 47% 11%;
+  --border: 215 25% 90%;
+  --input: 215 25% 88%;
+  --muted: 215 30% 95.5%;
+  --muted-foreground: 215 16% 44%;
+  --primary: 239 84% 67%;
+  --primary-hover: 243 75% 59%;
+  --primary-foreground: 0 0% 100%;
+  --accent: 199 89% 48%;
+  --accent-foreground: 0 0% 100%;
+  --navy: 222 47% 11%;
+  --navy-foreground: 210 40% 98%;
+  --success: 160 84% 39%;
+  --warning: 38 92% 50%;
+  --danger: 350 89% 60%;
+  --ring: 239 84% 67%;
+  --logo-sky: #0ea5e9;
+  --logo-indigo: #6366f1;
+  --logo-text: #0f172a;
+  --logo-overlap: #ffffff;
+  --shadow-soft: 0 1px 2px hsl(222 47% 11% / 0.04), 0 8px 24px -12px hsl(222 47% 11% / 0.12);
   color-scheme: light;
 }
 .dark {
-  --background: 228 27% 9%;
-  --foreground: 225 24% 93%;
-  --card: 228 25% 12%;
-  --border: 228 19% 21%;
-  --primary: 258 83% 65%;
-  --muted: 228 22% 17%;
-  --muted-foreground: 226 14% 65%;
+  --background: 226 50% 6%;
+  --foreground: 213 31% 91%;
+  --card: 229 38% 10%;
+  --card-foreground: 213 31% 91%;
+  --border: 229 28% 18%;
+  --input: 229 28% 22%;
+  --muted: 229 30% 14%;
+  --muted-foreground: 220 15% 64%;
+  --primary: 237 86% 70%;
+  --primary-hover: 239 84% 76%;
+  --primary-foreground: 0 0% 100%;
+  --accent: 199 95% 60%;
+  --accent-foreground: 222 47% 11%;
+  --navy: 222 47% 11%;
+  --navy-foreground: 210 40% 98%;
+  --success: 158 64% 52%;
+  --warning: 43 96% 56%;
+  --danger: 351 95% 71%;
+  --ring: 237 86% 70%;
+  --logo-sky: #38bdf8;
+  --logo-indigo: #818cf8;
+  --logo-text: #ffffff;
+  --logo-overlap: #ffffff;
+  --shadow-soft: 0 1px 2px hsl(0 0% 0% / 0.3), 0 8px 24px -12px hsl(0 0% 0% / 0.5);
   color-scheme: dark;
 }
+
 * {
   border-color: hsl(var(--border));
+}
+html {
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 body {
   background: hsl(var(--background));
   color: hsl(var(--foreground));
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-feature-settings: "cv11", "ss01";
   margin: 0;
 }
+h1, h2, h3, .font-display {
+  font-family: var(--font-poppins), var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: -0.01em;
+}
+::selection {
+  background: hsl(var(--primary) / 0.22);
+}
+
 input,
 select,
 textarea {
   background: hsl(var(--card));
   color: hsl(var(--foreground));
-  border: 1px solid hsl(var(--border));
-  border-radius: 8px;
-  padding: 0.65rem 0.8rem;
+  border: 1px solid hsl(var(--input));
+  border-radius: 10px;
+  padding: 0.65rem 0.85rem;
   font-size: 0.875rem;
   width: 100%;
   outline: none;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+input::placeholder,
+textarea::placeholder {
+  color: hsl(var(--muted-foreground) / 0.8);
 }
 input:focus,
 select:focus,
 textarea:focus {
   border-color: hsl(var(--primary));
-  box-shadow: 0 0 0 3px hsl(var(--primary) / 0.1);
+  box-shadow: 0 0 0 3px hsl(var(--primary) / 0.18);
+}
+input[type="range"] {
+  accent-color: hsl(var(--primary));
+  box-shadow: none;
+  border: 0;
+  padding: 0;
+  background: transparent;
 }
 input[type="checkbox"] {
   width: 16px;
@@ -59,6 +121,7 @@ label {
   font-weight: 600;
   display: block;
   margin-bottom: 0.4rem;
+  color: hsl(var(--foreground) / 0.9);
 }
 textarea {
   min-height: 105px;
@@ -69,20 +132,38 @@ a,
 input {
   -webkit-tap-highlight-color: transparent;
 }
+a:focus-visible,
+button:focus-visible,
+[role="button"]:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
 @layer components {
   .panel {
-    @apply rounded-xl border border-border bg-card;
+    @apply rounded-xl border border-border bg-card shadow-soft;
   }
   .section-title {
     @apply text-[15px] font-semibold tracking-tight;
   }
   .error {
-    @apply rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-300;
+    @apply rounded-lg border border-danger/30 bg-danger/10 p-3 text-sm text-danger;
+  }
+  .notice {
+    @apply rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm;
   }
   .field {
     @apply space-y-1;
   }
+  .avatar {
+    @apply flex items-center justify-center rounded-full bg-primary/12 text-xs font-semibold text-primary;
+  }
+  .icon-tile {
+    @apply flex items-center justify-center rounded-lg bg-primary/10 text-primary;
+  }
 }
+
 @media print {
   aside,
   header,
@@ -95,6 +176,7 @@ input {
   }
   .panel {
     break-inside: avoid;
+    box-shadow: none;
   }
   body {
     background: white;

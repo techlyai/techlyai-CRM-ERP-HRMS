@@ -66,7 +66,7 @@ export function Notifications({
       {soundBlocked && (
         <p
           role="status"
-          className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800"
+          className="mb-4 rounded-lg border border-warning/40 bg-warning/10 p-3 text-xs text-foreground"
         >
           Your browser blocked sound playback. Your notifications are still
           available here. Use sound preview in Settings to enable audio during
@@ -77,9 +77,9 @@ export function Notifications({
         {items.map((n) => (
           <div
             key={n.id}
-            className={`flex items-start gap-4 p-5 ${!n.read_at ? "bg-violet-500/[.03]" : ""}`}
+            className={`flex items-start gap-4 p-5 ${!n.read_at ? "bg-primary/[.04]" : ""}`}
           >
-            <span className="rounded-xl bg-violet-500/10 p-2.5 text-primary">
+            <span className="rounded-xl bg-primary/10 p-2.5 text-primary">
               <Bell size={17} />
             </span>
             <div className="flex-1">

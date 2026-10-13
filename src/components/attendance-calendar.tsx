@@ -72,14 +72,14 @@ export function AttendanceCalendar({
             <div
               key={date}
               title={title}
-              className={`flex min-h-[68px] flex-col justify-between rounded-lg border p-2 sm:min-h-[82px] ${status === "Late" ? "border-amber-500/25 bg-amber-500/5" : status === "Present" ? "border-emerald-500/25 bg-emerald-500/5" : status === "Absent" ? "border-rose-500/25 bg-rose-500/5" : "bg-muted/20"}`}
+              className={`flex min-h-[68px] flex-col justify-between rounded-lg border p-2 sm:min-h-[82px] ${status === "Late" ? "border-warning/25 bg-warning/5" : status === "Present" ? "border-success/25 bg-success/5" : status === "Absent" ? "border-danger/25 bg-danger/5" : "bg-muted/20"}`}
             >
               <span className="text-xs font-medium">{day}</span>
               <span className="hidden text-[9px] text-muted-foreground sm:block">
                 {status}
               </span>
               <span
-                className={`mt-2 h-1 w-4 rounded-full sm:hidden ${status === "Present" ? "bg-emerald-500" : status === "Late" ? "bg-amber-500" : "bg-muted-foreground/20"}`}
+                className={`mt-2 h-1 w-4 rounded-full sm:hidden ${status === "Present" ? "bg-success" : status === "Late" ? "bg-warning" : "bg-muted-foreground/20"}`}
               />
             </div>
           );

@@ -48,10 +48,12 @@ export function LoginForm({
             id="phone"
             name="phone"
             type="tel"
+            inputMode="tel"
             autoComplete="username"
             placeholder="+91 98765 43210"
             required
             disabled={!configured}
+            className="h-11"
           />
         </div>
       )}
@@ -69,13 +71,13 @@ export function LoginForm({
             required
             minLength={change ? 12 : 1}
             disabled={!configured}
-            className="pr-12"
+            className="h-11 pr-12"
           />
           <button
             type="button"
             onClick={() => setShow(!show)}
             aria-label={show ? "Hide password" : "Show password"}
-            className="absolute right-3 top-3 text-muted-foreground"
+            className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted-foreground transition-colors hover:text-foreground"
           >
             {show ? <EyeOff size={17} /> : <Eye size={17} />}
           </button>
@@ -83,7 +85,7 @@ export function LoginForm({
       </div>
       {change && (
         <>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs leading-5 text-muted-foreground">
             Use at least 12 characters with uppercase and lowercase letters and
             a number.
           </p>
@@ -96,6 +98,7 @@ export function LoginForm({
               autoComplete="new-password"
               minLength={12}
               required
+              className="h-11"
             />
           </div>
         </>
@@ -105,10 +108,15 @@ export function LoginForm({
           {error}
         </p>
       )}
-      <Button type="submit" className="w-full" disabled={busy || !configured}>
+      <Button
+        type="submit"
+        size="lg"
+        className="w-full"
+        disabled={busy || !configured}
+      >
         {busy ? <Loader2 size={16} className="animate-spin" /> : null}
-        {change ? "Set password & continue" : "Sign in to your workspace"}
-        <ArrowRight size={16} />
+        {change ? "Set password and continue" : "Sign in"}
+        {!busy && <ArrowRight size={16} />}
       </Button>
       <p className="text-center text-xs text-muted-foreground">
         {change

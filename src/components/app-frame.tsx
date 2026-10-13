@@ -26,20 +26,18 @@ import {
   Settings2,
   Bell,
   Search,
-  Sun,
-  Moon,
   ChevronDown,
   Menu,
   X,
   LogOut,
   ShieldCheck,
-  ArrowUpRight,
   Command,
 } from "lucide-react";
 import { modules, type Profile } from "@/lib/modules";
 import { logout } from "@/lib/actions";
-import { Button } from "./ui/button";
 import { unlockAlertSound } from "@/lib/audio";
+import { Logo } from "./logo";
+import { ThemeToggle } from "./theme-toggle";
 const icons: Record<string, React.ElementType> = {
   Target,
   Building2,
@@ -75,7 +73,6 @@ export function AppFrame({
 }) {
   const pathname = usePathname();
   const [mobile, setMobile] = useState(false);
-  const [dark, setDark] = useState(false);
   const [unreadCount, setUnreadCount] = useState(unread);
   useEffect(() => setUnreadCount(unread), [unread]);
   useEffect(() => {
@@ -88,24 +85,13 @@ export function AppFrame({
       );
     window.addEventListener("techly:unread", update);
     document.addEventListener("pointerdown", unlockAlertSound);
+    if ("serviceWorker" in navigator)
+      navigator.serviceWorker.register("/sw.js").catch(() => {});
     return () => {
       window.removeEventListener("techly:unread", update);
       document.removeEventListener("pointerdown", unlockAlertSound);
     };
   }, []);
-  useEffect(() => {
-    const isDark = localStorage.getItem("techly-theme") === "dark";
-    setDark(isDark);
-    document.documentElement.classList.toggle("dark", isDark);
-    if ("serviceWorker" in navigator)
-      navigator.serviceWorker.register("/sw.js").catch(() => {});
-  }, []);
-  const theme = () => {
-    const next = !dark;
-    setDark(next);
-    document.documentElement.classList.toggle("dark", next);
-    localStorage.setItem("techly-theme", next ? "dark" : "light");
-  };
   const initials = profile.full_name
     .split(" ")
     .map((s) => s[0])
@@ -119,9 +105,10 @@ export function AppFrame({
         onClick={() => setMobile(false)}
         href={href}
         key={href}
-        className={`group flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] transition-colors ${active ? "bg-violet-500/10 font-semibold text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}
+        aria-current={active ? "page" : undefined}
+        className={`group flex items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] transition-colors ${active ? "bg-primary/10 font-semibold text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}
       >
-        <Icon size={17} />
+        <Icon size={17} strokeWidth={active ? 2.25 : 2} />
         <span className="flex-1">{label}</span>
         {active && <span className="h-1.5 w-1.5 rounded-full bg-primary" />}
       </Link>
@@ -132,35 +119,26 @@ export function AppFrame({
       <div
         onClick={() => setMobile(false)}
         className={
-          mobile ? "fixed inset-0 z-30 bg-black/40 lg:hidden" : "hidden"
+          mobile ? "fixed inset-0 z-30 bg-navy/50 backdrop-blur-[2px] lg:hidden" : "hidden"
         }
       />
       <aside
         className={`fixed inset-y-0 left-0 z-40 flex w-[248px] flex-col border-r border-border bg-card transition-transform lg:translate-x-0 ${mobile ? "translate-x-0" : "-translate-x-full"}`}
       >
-        <Link
-          href="/"
-          className="flex h-[76px] items-center gap-2.5 border-b border-border px-6"
-        >
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-xl font-black text-white shadow-md shadow-violet-500/20">
-            t<span className="text-violet-200">.</span>
-          </span>
-          <span className="text-[25px] font-bold tracking-tight">
-            techly<span className="text-primary">.</span>
-          </span>
+        <div className="flex h-[76px] items-center border-b border-border px-6">
+          <Link href="/" aria-label="Techly home" className="rounded-md">
+            <Logo size={26} />
+          </Link>
           <button
-            className="ml-auto lg:hidden"
+            className="ml-auto rounded-md p-1 text-muted-foreground lg:hidden"
             aria-label="Close navigation"
-            onClick={(e) => {
-              e.preventDefault();
-              setMobile(false);
-            }}
+            onClick={() => setMobile(false)}
           >
             <X size={18} />
           </button>
-        </Link>
+        </div>
         <div className="mx-4 mt-5 flex items-center gap-3 rounded-lg border border-border p-3">
-          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-muted text-primary">
+          <div className="icon-tile h-8 w-8 rounded-md">
             <Building2 size={17} />
           </div>
           <div className="flex-1">
@@ -204,9 +182,7 @@ export function AppFrame({
             nav("/activity", "Activity & audit", FileText)}
           {nav("/settings", "Settings", Settings2)}
           <div className="mt-3 flex items-center gap-2.5 border-t border-border pt-4">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-violet-100 text-xs font-semibold text-violet-700">
-              {initials}
-            </div>
+            <div className="avatar h-8 w-8">{initials}</div>
             <div className="min-w-0 flex-1">
               <div className="truncate text-xs font-semibold">
                 {profile.full_name}
@@ -218,27 +194,31 @@ export function AppFrame({
             <button
               aria-label="Sign out"
               title="Sign out"
+              className="rounded-md p-1 text-muted-foreground transition-colors hover:text-foreground"
               onClick={() => logout()}
             >
-              <LogOut size={15} className="text-muted-foreground" />
+              <LogOut size={15} />
             </button>
           </div>
         </div>
       </aside>
       <div className="lg:pl-[248px]">
-        <header className="sticky top-0 z-20 flex h-[76px] items-center justify-between gap-4 border-b border-border bg-card/95 px-5 backdrop-blur lg:px-8">
+        <header className="sticky top-0 z-20 flex h-[76px] items-center justify-between gap-4 border-b border-border bg-card/90 px-5 backdrop-blur lg:px-8">
           <button
-            className="lg:hidden"
+            className="rounded-md text-foreground lg:hidden"
             aria-label="Open navigation"
             onClick={() => setMobile(true)}
           >
             <Menu size={22} />
           </button>
+          <Link href="/" aria-label="Techly home" className="lg:hidden">
+            <Logo variant="mark" size={22} />
+          </Link>
           <form
             action="/search"
             className="flex max-w-md flex-1 items-center gap-2"
           >
-            <Search size={17} className="text-muted-foreground" />
+            <Search size={17} className="shrink-0 text-muted-foreground" />
             <input
               name="q"
               aria-label="Search authorized records"
@@ -249,27 +229,20 @@ export function AppFrame({
               <Command size={10} />
             </span>
           </form>
-          <div className="flex items-center gap-2 md:gap-4">
+          <div className="flex items-center gap-1 md:gap-3">
             <div className="hidden items-center gap-1.5 text-[11px] text-muted-foreground xl:flex">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-              Your connected workspace
+              <span className="h-1.5 w-1.5 rounded-full bg-success" />
+              Connected
             </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={theme}
-              aria-label={dark ? "Use light mode" : "Use dark mode"}
-            >
-              {dark ? <Sun size={18} /> : <Moon size={18} />}
-            </Button>
+            <ThemeToggle className="text-muted-foreground" />
             <Link
               href="/notifications"
-              className="relative p-2"
+              className="relative rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
               aria-label={`${unreadCount} unread notifications`}
             >
               <Bell size={18} />
               {unreadCount > 0 && (
-                <span className="absolute right-0 top-0 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[9px] text-white">
+                <span className="absolute right-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[9px] font-semibold text-primary-foreground">
                   {unreadCount > 99 ? "99+" : unreadCount}
                 </span>
               )}
@@ -277,7 +250,8 @@ export function AppFrame({
             <div className="hidden h-7 w-px bg-border sm:block" />
             <Link
               href="/settings"
-              className="flex h-8 w-8 items-center justify-center rounded-full bg-violet-100 text-xs font-semibold text-violet-700"
+              aria-label="Your settings"
+              className="avatar h-8 w-8"
             >
               {initials}
             </Link>
@@ -286,7 +260,7 @@ export function AppFrame({
         <main className="mx-auto max-w-[1600px] p-5 pb-24 lg:p-8">
           {children}
         </main>
-        <nav className="fixed bottom-0 left-0 right-0 z-20 flex items-center justify-around border-t border-border bg-card py-3 lg:hidden">
+        <nav className="fixed bottom-0 left-0 right-0 z-20 flex items-center justify-around border-t border-border bg-card/95 py-3 backdrop-blur lg:hidden">
           {[
             ["/", "Overview", LayoutDashboard],
             ["/modules/tasks", "Tasks", CheckSquare],
@@ -298,7 +272,7 @@ export function AppFrame({
               <Link
                 key={String(href)}
                 href={String(href)}
-                className={`flex flex-col items-center gap-1 text-[10px] ${pathname === href ? "text-primary" : "text-muted-foreground"}`}
+                className={`flex flex-col items-center gap-1 text-[10px] ${pathname === href ? "font-semibold text-primary" : "text-muted-foreground"}`}
               >
                 <C size={19} />
                 {String(label)}
