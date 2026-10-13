@@ -1,5 +1,10 @@
 # Techly
 
+**Deploy the complete platform from the `backend` branch only.** Its root
+[`docker-compose.yml`](docker-compose.yml) starts the website, APIs, PostgreSQL,
+database setup and reminder worker in one Dokploy application. Follow
+[docs/DOKPLOY.md](docs/DOKPLOY.md). No separate frontend deployment is needed.
+
 Next.js App Router + TypeScript business management platform using **standalone PostgreSQL** for company data, phone/password authentication, sessions, private documents, and notification sounds.
 
 Twenty modules cover CRM, renewals, HRIS, attendance, EOD reports, leave, projects, inventory, assets, purchases, expenses, and finance. Backend workflow functions and PostgreSQL RLS enforce record access and transactional approvals.

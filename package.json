@@ -8,12 +8,12 @@
     "start": "next start -H 127.0.0.1",
     "typecheck": "tsc --noEmit",
     "test": "node scripts/run-ts.cjs tests/run.ts",
-    "create-admin": "node --env-file=.env.local scripts/run-ts.cjs scripts/create-admin.ts",
+    "create-admin": "node --env-file-if-exists=.env.local scripts/run-ts.cjs scripts/create-admin.ts",
     "db:verify": "node --env-file=.env.database scripts/run-ts.cjs scripts/verify-database.ts",
     "db:contracts": "node scripts/run-ts.cjs scripts/generate-contracts.ts",
     "db:start": "powershell -NoProfile -File scripts/local-postgres.ps1 start",
     "db:stop": "powershell -NoProfile -File scripts/local-postgres.ps1 stop",
-    "db:setup": "node --env-file=.env.database scripts/run-ts.cjs scripts/setup-database.ts",
+    "db:setup": "node --env-file-if-exists=.env.database scripts/run-ts.cjs scripts/setup-database.ts",
     "db:docker:prepare": "powershell -NoProfile -File scripts/docker-postgres.ps1 prepare",
     "db:docker:start": "powershell -NoProfile -File scripts/docker-postgres.ps1 start",
     "db:docker:stop": "powershell -NoProfile -File scripts/docker-postgres.ps1 stop",
@@ -46,8 +46,10 @@
     "tailwindcss": "3.4.18",
     "postcss": "8.5.6",
     "autoprefixer": "10.4.21",
-    "tsx": "4.21.0",
     "prettier": "3.6.2",
     "@types/pg": "8.23.1"
+  },
+  "engines": {
+    "node": ">=22.18.0 <23"
   }
 }

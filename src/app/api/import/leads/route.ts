@@ -4,10 +4,10 @@ import { context } from "@/lib/database";
 import { parseCSV } from "@/lib/domain";
 import { parseXlsx } from "@/lib/reports";
 import { validateRecord } from "@/lib/modules";
+import { requireSameOrigin } from "@/lib/request-origin";
 export async function POST(req: NextRequest) {
   try {
-    if (req.headers.get("origin") !== req.nextUrl.origin)
-      throw Error("Invalid origin");
+    requireSameOrigin(req);
     const { db, profile } = await context();
     const f = await req.formData();
     const file = f.get("file");

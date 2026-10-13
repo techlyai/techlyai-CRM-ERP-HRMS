@@ -138,7 +138,7 @@ export function Settings({
       {message && (
         <p
           role="status"
-          className="mb-5 rounded-lg border bg-violet-500/5 p-3 text-sm"
+          className="mb-5 rounded-lg border bg-primary/5 p-3 text-sm"
         >
           {message}
         </p>
@@ -554,7 +554,7 @@ export function Settings({
                     )}
                     <button
                       type="button"
-                      className="text-rose-500"
+                      className="text-danger"
                       onClick={() =>
                         setS({
                           ...s,

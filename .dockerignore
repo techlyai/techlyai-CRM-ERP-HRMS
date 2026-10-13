@@ -1,0 +1,14 @@
+.git
+.env*
+!.env.example
+node_modules
+.next
+.local
+artifacts
+deploy
+.agents
+.codex
+.aws
+*.log
+*.tsbuildinfo
+.npm-cache

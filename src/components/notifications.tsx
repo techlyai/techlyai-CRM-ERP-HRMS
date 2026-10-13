@@ -5,21 +5,8 @@ import { useRouter } from "next/navigation";
 import { Bell, Check, Volume2 } from "lucide-react";
 import { markRead } from "@/lib/actions";
 import { Button } from "./ui/button";
-export type Notification = {
-  id: string;
-  category: string;
-  title: string;
-  body: string;
-  record_id: string | null;
-  read_at: string | null;
-  created_at: string;
-};
-export type Preferences = {
-  muted: boolean;
-  volume: number;
-  categories: Record<string, { muted?: boolean; sound?: string }>;
-  snoozed_until?: string;
-};
+import type { Notification, Preferences } from "@/lib/notification-types";
+export type { Notification, Preferences } from "@/lib/notification-types";
 export function Notifications({
   initial,
   preferences,
@@ -79,7 +66,7 @@ export function Notifications({
       {soundBlocked && (
         <p
           role="status"
-          className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800"
+          className="mb-4 rounded-lg border border-warning/40 bg-warning/10 p-3 text-xs text-foreground"
         >
           Your browser blocked sound playback. Your notifications are still
           available here. Use sound preview in Settings to enable audio during
@@ -90,9 +77,9 @@ export function Notifications({
         {items.map((n) => (
           <div
             key={n.id}
-            className={`flex items-start gap-4 p-5 ${!n.read_at ? "bg-violet-500/[.03]" : ""}`}
+            className={`flex items-start gap-4 p-5 ${!n.read_at ? "bg-primary/[.04]" : ""}`}
           >
-            <span className="rounded-xl bg-violet-500/10 p-2.5 text-primary">
+            <span className="rounded-xl bg-primary/10 p-2.5 text-primary">
               <Bell size={17} />
             </span>
             <div className="flex-1">

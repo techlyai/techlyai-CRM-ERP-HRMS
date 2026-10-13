@@ -9,9 +9,9 @@ import {
   CHUNK_SIZE,
 } from "@/lib/storage";
 import { z } from "zod";
+import { requireSameOrigin } from "@/lib/request-origin";
 function origin(req: NextRequest) {
-  if (req.headers.get("origin") !== req.nextUrl.origin)
-    throw Error("Invalid request origin");
+  requireSameOrigin(req);
 }
 function error(e: unknown) {
   return NextResponse.json(

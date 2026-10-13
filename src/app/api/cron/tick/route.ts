@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { timingSafeEqual } from "node:crypto";
 import webpush from "web-push";
 import { serviceDB } from "@/lib/database";
-import type { Notification, Preferences } from "@/components/notifications";
+import type { Notification, Preferences } from "@/lib/notification-types";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 export async function GET(req: NextRequest) {

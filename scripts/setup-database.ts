@@ -12,6 +12,10 @@ const files = [
 ];
 const literal = (s: string) => "'" + s.replaceAll("'", "''") + "'";
 async function main() {
+  const writeRuntimeEnv = process.env.WRITE_RUNTIME_ENV !== "false";
+  const suppliedPassword = process.env.DATABASE_APP_PASSWORD;
+  if (!writeRuntimeEnv && !/^[a-f0-9]{64}$/.test(suppliedPassword || ""))
+    throw Error("Container setup requires DATABASE_APP_PASSWORD as 64 random hex characters.");
   const url = process.env.DATABASE_ADMIN_URL;
   if (!url)
     throw Error(
@@ -83,7 +87,7 @@ async function main() {
       }
       console.log("Applied " + files[i]);
     }
-    const password = randomBytes(32).toString("hex");
+    const password = suppliedPassword || randomBytes(32).toString("hex");
     await c.query(
       `create role techly_app login noinherit nosuperuser nocreatedb nocreaterole nobypassrls password ${literal(password)}`,
     );
@@ -105,6 +109,11 @@ async function main() {
     const app = new URL(url);
     app.username = "techly_app";
     app.password = password;
+    if (!writeRuntimeEnv) {
+      await c.query("commit");
+      console.log("Schema installed. Runtime credentials are supplied by the container environment.");
+      return;
+    }
     const previous = existsSync(".env.local")
       ? readFileSync(".env.local", "utf8")
       : "";

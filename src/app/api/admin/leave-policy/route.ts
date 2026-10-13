@@ -2,10 +2,10 @@ export const dynamic = "force-dynamic";
 import { NextResponse, type NextRequest } from "next/server";
 import { context } from "@/lib/database";
 import { z } from "zod";
+import { requireSameOrigin } from "@/lib/request-origin";
 export async function POST(req: NextRequest) {
   try {
-    if (req.headers.get("origin") !== req.nextUrl.origin)
-      throw Error("Invalid origin");
+    requireSameOrigin(req);
     const { db, profile } = await context();
     if (profile.role !== "super_admin") throw Error("Permission denied");
     const p = z

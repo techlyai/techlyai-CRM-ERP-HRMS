@@ -17,7 +17,7 @@ export function pool() {
   if (!globalPool.techlyPool) {
     globalPool.techlyPool = new Pool({
       connectionString: process.env.DATABASE_URL,
-      max: 10,
+      max: Number(process.env.DATABASE_POOL_SIZE) || 10,
       connectionTimeoutMillis: 8000,
       idleTimeoutMillis: 30000,
       statement_timeout: 30000,
