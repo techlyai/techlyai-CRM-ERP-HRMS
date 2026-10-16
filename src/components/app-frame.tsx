@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   LayoutDashboard,
   Target,
@@ -74,6 +74,21 @@ export function AppFrame({
   const pathname = usePathname();
   const [mobile, setMobile] = useState(false);
   const [unreadCount, setUnreadCount] = useState(unread);
+  const navRef = useRef<HTMLElement>(null);
+  // Keep the active link visible when the menu is longer than the screen.
+  // Only the menu's own vertical scroll moves; the page and sidebar never shift.
+  useEffect(() => {
+    const menu = navRef.current;
+    const link = menu?.querySelector<HTMLElement>('[aria-current="page"]');
+    if (!menu || !link) return;
+    const box = menu.getBoundingClientRect();
+    const item = link.getBoundingClientRect();
+    const margin = 48;
+    if (item.top < box.top + margin)
+      menu.scrollTo({ top: menu.scrollTop - (box.top + margin - item.top), behavior: "auto" });
+    else if (item.bottom > box.bottom - margin)
+      menu.scrollTo({ top: menu.scrollTop + (item.bottom - (box.bottom - margin)), behavior: "auto" });
+  }, [pathname, mobile]);
   useEffect(() => setUnreadCount(unread), [unread]);
   useEffect(() => {
     const update = (event: Event) =>
@@ -137,7 +152,7 @@ export function AppFrame({
             <X size={18} />
           </button>
         </div>
-        <div className="mx-4 mt-5 flex items-center gap-3 rounded-lg border border-border p-3">
+        <div className="mx-4 mt-4 flex shrink-0 items-center gap-3 rounded-lg border border-border p-3">
           <div className="icon-tile h-8 w-8 rounded-md">
             <Building2 size={17} />
           </div>
@@ -149,7 +164,11 @@ export function AppFrame({
           </div>
           <ChevronDown size={14} className="text-muted-foreground" />
         </div>
-        <div className="flex-1 overflow-y-auto px-4 pb-4 pt-5">
+        <nav
+          ref={navRef}
+          aria-label="Main navigation"
+          className="scroll-thin scroll-fade mt-4 min-h-0 flex-1 overflow-y-auto overflow-x-hidden overscroll-contain px-4 pb-6 pt-1"
+        >
           {nav("/", "Overview", LayoutDashboard)}
           {["Business", "Work", "People", "Operations", "Finance"].map(
             (group) => {
@@ -173,15 +192,20 @@ export function AppFrame({
               );
             },
           )}
-        </div>
-        <div className="border-t border-border p-4">
-          {nav("/notifications", "Notifications", Bell)}
-          {profile.role === "super_admin" &&
-            nav("/users", "Users & access", ShieldCheck)}
-          {profile.role === "super_admin" &&
-            nav("/activity", "Activity & audit", FileText)}
-          {nav("/settings", "Settings", Settings2)}
-          <div className="mt-3 flex items-center gap-2.5 border-t border-border pt-4">
+          <div className="mt-5">
+            <div className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-[.12em] text-muted-foreground/70">
+              Workspace
+            </div>
+            {nav("/notifications", "Notifications", Bell)}
+            {profile.role === "super_admin" &&
+              nav("/users", "Users & access", ShieldCheck)}
+            {profile.role === "super_admin" &&
+              nav("/activity", "Activity & audit", FileText)}
+            {nav("/settings", "Settings", Settings2)}
+          </div>
+        </nav>
+        <div className="border-t border-border px-4 py-3">
+          <div className="flex items-center gap-2.5 rounded-lg px-2 py-1.5">
             <div className="avatar h-8 w-8">{initials}</div>
             <div className="min-w-0 flex-1">
               <div className="truncate text-xs font-semibold">

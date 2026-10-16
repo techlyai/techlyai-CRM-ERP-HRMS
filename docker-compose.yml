@@ -45,6 +45,9 @@ services:
       NEXT_PUBLIC_VAPID_PUBLIC_KEY: ${NEXT_PUBLIC_VAPID_PUBLIC_KEY:-}
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
       VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:admin@techly.app}
+      # Client credentials vault key (64 hex characters). Without it the Credentials tab stays disabled.
+      CREDENTIALS_ENCRYPTION_KEY: ${CREDENTIALS_ENCRYPTION_KEY:-}
+      CREDENTIALS_PREVIOUS_KEYS: ${CREDENTIALS_PREVIOUS_KEYS:-}
     depends_on:
       migrate:
         condition: service_completed_successfully
