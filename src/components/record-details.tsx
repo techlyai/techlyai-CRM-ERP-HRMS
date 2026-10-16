@@ -60,6 +60,8 @@ export function RecordDetails({
   canEdit,
   canApprove,
   canUpload,
+  credentials,
+  initialTab,
 }: {
   record: BusinessRecord;
   profile: Profile;
@@ -85,6 +87,10 @@ export function RecordDetails({
   canEdit: boolean;
   canApprove: boolean;
   canUpload: boolean;
+  /** Server-rendered Credentials tab, present only for clients the user may manage. */
+  credentials?: React.ReactNode;
+  /** Tab requested in the address (?tab=credentials), resolved on the server. */
+  initialTab?: string;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -92,7 +98,9 @@ export function RecordDetails({
   const [dialog, setDialog] = useState("");
   const [parent, setParent] = useState<string>();
   const [key, setKey] = useState("");
-  const [tab, setTab] = useState("details");
+  const [tab, setTab] = useState(
+    initialTab === "credentials" && credentials ? "credentials" : "details",
+  );
   const m = moduleMap[r.module];
   function open(action: string, parentId?: string) {
     setDialog(action);
@@ -277,12 +285,22 @@ export function RecordDetails({
         </p>
       )}
       <div className="mb-5 flex gap-5 border-b border-border">
-        {["details", "conversation", "history"].map((t) => (
+        {[
+          "details",
+          "conversation",
+          "history",
+          ...(credentials ? ["credentials"] : []),
+        ].map((t) => (
           <button
             key={t}
             onClick={() => {
               setTab(t);
               if (t === "conversation") markQuestionsRead(r.id);
+              // Keep the tab in the address so a refresh returns to it.
+              const url = new URL(window.location.href);
+              if (t === "credentials") url.searchParams.set("tab", t);
+              else url.searchParams.delete("tab");
+              window.history.replaceState(null, "", url);
             }}
             className={`border-b-2 px-1 pb-3 text-xs capitalize ${tab === t ? "border-primary font-semibold text-primary" : "border-transparent text-muted-foreground"}`}
           >
@@ -293,7 +311,10 @@ export function RecordDetails({
           </button>
         ))}
       </div>
-      <div className="grid gap-6 xl:grid-cols-[1.7fr_1fr]">
+      {tab === "credentials" && credentials}
+      <div
+        className={`grid gap-6 xl:grid-cols-[1.7fr_1fr] ${tab === "credentials" ? "hidden" : ""}`}
+      >
         <div className="space-y-5">
           {tab === "details" && (
             <section className="panel p-5">

@@ -15,6 +15,8 @@ const tables = new Set([
   "notifications",
   "push_subscriptions",
   "scheduler_runs",
+  "client_credentials",
+  "credential_audit",
 ]);
 export function identifier(value: string) {
   if (!/^[a-z_][a-z0-9_]*$/.test(value))
