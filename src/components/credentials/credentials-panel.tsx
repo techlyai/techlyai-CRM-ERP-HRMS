@@ -1110,7 +1110,7 @@ function HistoryDialog({
               <div className="flex-1">
                 <label htmlFor="unlock-password" className="flex items-center gap-1.5">
                   <ShieldCheck size={13} className="text-primary" />
-                  Confirm your Techly password to open previous passwords
+                  Confirm your Orbit password to open previous passwords
                 </label>
                 <input
                   id="unlock-password"

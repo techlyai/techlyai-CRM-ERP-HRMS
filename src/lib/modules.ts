@@ -243,7 +243,7 @@ export const modules: Module[] = [
       "Inactive",
     ],
     fields: [
-      text("employee_id", "Employee ID", true),
+      text("employee_id", "Employee ID (generated automatically when blank)"),
       text("phone", "Phone", true),
       { key: "email", label: "Email", type: "email" },
       text("department", "Department", true),
@@ -350,6 +350,7 @@ export const modules: Module[] = [
       "Draft",
       "Submitted",
       "Clarification Required",
+      "Resubmitted",
       "Approved",
       "Rejected",
     ],
@@ -381,6 +382,7 @@ export const modules: Module[] = [
       "Draft",
       "Submitted",
       "Clarification Required",
+      "Resubmitted",
       "Approved",
       "Rejected",
       "Cancellation Requested",
@@ -499,7 +501,14 @@ export const modules: Module[] = [
     description: "The complete service history of every asset.",
     group: "Operations",
     icon: "Settings2",
-    statuses: ["Draft", "Submitted", "Approved", "Rejected"],
+    statuses: [
+      "Draft",
+      "Submitted",
+      "Clarification Required",
+      "Resubmitted",
+      "Approved",
+      "Rejected",
+    ],
     workflow: true,
     fields: [
       text("asset_id", "Asset record UUID", true),
@@ -541,6 +550,7 @@ export const modules: Module[] = [
       "Draft",
       "Submitted",
       "Clarification Required",
+      "Resubmitted",
       "Approved",
       "Rejected",
       "Received",
@@ -577,6 +587,7 @@ export const modules: Module[] = [
       "Draft",
       "Submitted",
       "Clarification Required",
+      "Resubmitted",
       "Approved",
       "Rejected",
       "Pending Payment",
@@ -730,6 +741,17 @@ export function validateRecord(module: string, input: unknown) {
     shape[f.key] = schema;
   }
   const data = z.object(shape).strict().parse(input);
+  if (module === "employees") {
+    // Blank on create: save_record generates the ID server-side. On edit a
+    // blank keeps the current ID (Admins only); a value must be a plain code.
+    const employeeId = String(data.employee_id ?? "").trim();
+    if (!employeeId) delete data.employee_id;
+    else if (!/^[A-Za-z0-9][A-Za-z0-9/_.-]{0,39}$/.test(employeeId))
+      throw Error(
+        "Employee ID may use letters, numbers, / _ . or - (up to 40 characters)",
+      );
+    else data.employee_id = employeeId;
+  }
   if (module === "eod" && !String(data.completed ?? "").trim())
     throw Error("Tasks completed is required");
   for (const field of ["reason", "purpose"])

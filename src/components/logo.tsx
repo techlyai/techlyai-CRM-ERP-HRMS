@@ -18,12 +18,12 @@ const tones: Record<Exclude<Tone, "auto">, React.CSSProperties> = {
 };
 const toneStyle = (tone: Tone) => (tone === "auto" ? undefined : tones[tone]);
 
-/** The Techly "Connect" symbol: two equal circles whose overlap is left white. */
+/** Orbit retains the two-circle Connect symbol from the Techly project. */
 export function LogoMark({
   size = 32,
   tone = "auto",
   className,
-  title = "Techly",
+  title = "Orbit",
 }: {
   size?: number;
   tone?: Tone;
@@ -57,7 +57,7 @@ export function LogoMark({
   );
 }
 
-/** Wordmark: "Tech" in navy, "ly" in indigo, Poppins SemiBold. */
+/** Orbit wordmark in Poppins SemiBold. */
 export function LogoWordmark({
   tone = "auto",
   className,
@@ -73,8 +73,8 @@ export function LogoWordmark({
       className={cn("font-display font-semibold leading-none", className)}
       style={{ ...toneStyle(tone), ...style }}
     >
-      <span style={{ color: "var(--logo-text)" }}>Tech</span>
-      <span style={{ color: "var(--logo-indigo)" }}>ly</span>
+      <span style={{ color: "var(--logo-text)" }}>Orb</span>
+      <span style={{ color: "var(--logo-indigo)" }}>it</span>
     </span>
   );
 }
@@ -108,10 +108,22 @@ export function Logo({
       style={{ gap: Math.round(size * (stacked ? 0.6 : 0.42)) }}
     >
       <LogoMark size={size} tone={tone} />
-      <LogoWordmark
-        tone={tone}
-        style={{ fontSize: Math.round(size * (stacked ? 1.1 : 0.95)) }}
-      />
+      <span className={cn("flex flex-col gap-1.5", stacked && "items-center")}>
+        <LogoWordmark
+          tone={tone}
+          style={{ fontSize: Math.round(size * (stacked ? 1.1 : 0.95)) }}
+        />
+        <span
+          className="whitespace-nowrap font-medium leading-none opacity-70"
+          style={{
+            ...toneStyle(tone),
+            color: "var(--logo-text)",
+            fontSize: Math.max(9, Math.round(size * 0.3)),
+          }}
+        >
+          A Techly project
+        </span>
+      </span>
     </span>
   );
 }

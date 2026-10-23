@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { timingSafeEqual } from "node:crypto";
 import webpush from "web-push";
 import { serviceDB } from "@/lib/database";
+import { processEmailQueue } from "@/lib/email";
 import type { Notification, Preferences } from "@/lib/notification-types";
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -20,6 +21,9 @@ export async function GET(req: NextRequest) {
   const db = serviceDB();
   try {
     const count = await db.rpc<number>("scheduler_tick");
+    // Reminder occurrences are scheduled in the database, so alerts fire even when no browser is open.
+    const reminders = await db.rpc<number>("reminders_tick");
+    const email = await processEmailQueue(20);
     let sent = 0;
     let failed = 0;
     if (
@@ -61,9 +65,9 @@ export async function GET(req: NextRequest) {
           }
           const payload = JSON.stringify({
             id: job.notification.id,
-            title: "Techly · " + job.notification.category,
+            title: "Orbit · " + job.notification.category.replace(/-/g, " "),
             body: "You have a new update. Sign in to your workspace to view it.",
-            url: "/notifications",
+            url: job.notification.link || "/notifications",
           });
           if (!job.subscriptions.length) {
             await db.rpc("finish_push_job", {
@@ -117,6 +121,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       ok: true,
       notifications: count,
+      reminders,
+      email,
       push_sent: sent,
       push_failed: failed,
     });

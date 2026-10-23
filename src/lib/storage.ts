@@ -3,10 +3,13 @@ import { transaction } from "./postgres";
 import { sessionProfile } from "./auth";
 import { validMagic, validateFile } from "./files";
 import { randomUUID } from "node:crypto";
+import { parseChatPath } from "../components/chat/helpers";
 export const CHUNK_SIZE = 3 * 1024 * 1024;
 export type UploadInfo = {
   record?: string;
   sound?: boolean;
+  /** Chat attachment target; mutually exclusive with record and sound. */
+  conversation?: string;
   name: string;
   mime: string;
   size: number;
@@ -30,9 +33,24 @@ async function recordPermission(
   await c.query("set local role techly_service");
   if (!rows.length) throw Error("Record unavailable or permission denied");
 }
+// Chat uploads require current membership; RLS on conversation_members enforces it.
+async function conversationMembership(c: PoolClient, conversation: string) {
+  await c.query("set local role techly_user");
+  const { rows } = await c.query(
+    "select 1 from public.conversation_members where conversation_id=$1 and user_id=private.current_user_id()",
+    [conversation],
+  );
+  await c.query("set local role techly_service");
+  if (!rows.length) throw Error("You are not part of this conversation");
+}
 export async function startUpload(token: string, info: UploadInfo) {
   validateFile(info.name, info.mime, info.size, info.sound);
-  if (!info.sound && !info.record) throw Error("Select a record");
+  if (info.conversation && (info.record || info.sound))
+    throw Error("Choose a record or a conversation, not both");
+  if (info.conversation && info.mime.startsWith("audio/"))
+    throw Error("Use JPG, PNG, WebP, PDF, DOCX, XLSX, or CSV files in chat.");
+  if (!info.sound && !info.record && !info.conversation)
+    throw Error("Select a record");
   return transaction(async (c) => {
     const profile = await checkedUser(c, token);
     // Serialize the quota check for simultaneous upload requests from one user.
@@ -49,13 +67,20 @@ export async function startUpload(token: string, info: UploadInfo) {
       Number(rows[0].count) >= 20
     )
       throw Error("Finish your pending uploads before adding more files.");
-    if (!info.sound) await recordPermission(c, info.record!, "upload");
-    const path = `${profile.id}/${info.sound ? "sounds" : info.record}/${randomUUID()}.${info.name.split(".").pop()!.toLowerCase()}`;
+    if (info.conversation) await conversationMembership(c, info.conversation);
+    else if (!info.sound) await recordPermission(c, info.record!, "upload");
+    const folder = info.sound
+      ? "sounds"
+      : info.conversation
+        ? "chat/" + info.conversation
+        : info.record;
+    const path = `${profile.id}/${folder}/${randomUUID()}.${info.name.split(".").pop()!.toLowerCase()}`;
     const result = await c.query(
-      "insert into private.uploads(user_id,record_id,path,name,mime,size,sound) values($1,$2,$3,$4,$5,$6,$7) returning id",
+      "insert into private.uploads(user_id,record_id,conversation_id,path,name,mime,size,sound) values($1,$2,$3,$4,$5,$6,$7,$8) returning id",
       [
         profile.id,
-        info.sound ? null : info.record,
+        info.sound || info.conversation ? null : info.record,
+        info.conversation || null,
         path,
         info.name,
         info.mime,
@@ -106,7 +131,10 @@ export async function finishUpload(token: string, id: string) {
     );
     const upload = rows[0];
     if (!upload) throw Error("Upload expired or already completed");
-    if (!upload.sound) await recordPermission(c, upload.record_id, "upload");
+    if (upload.conversation_id)
+      await conversationMembership(c, upload.conversation_id);
+    else if (!upload.sound)
+      await recordPermission(c, upload.record_id, "upload");
     const parts = await c.query(
       "select part,content from private.upload_parts where upload_id=$1 order by part",
       [id],
@@ -131,7 +159,7 @@ export async function finishUpload(token: string, id: string) {
         bytes,
       ],
     );
-    if (!upload.sound) {
+    if (!upload.sound && !upload.conversation_id) {
       await c.query("set local role techly_user");
       await c.query("select public.attach_file($1,$2,$3,$4,$5)", [
         upload.record_id,
@@ -143,7 +171,41 @@ export async function finishUpload(token: string, id: string) {
       await c.query("set local role techly_service");
     }
     await c.query("delete from private.uploads where id=$1", [id]);
-    return { path: upload.path as string };
+    return {
+      path: upload.path as string,
+      name: upload.name as string,
+      mime: upload.mime as string,
+      size: Number(upload.size),
+    };
+  });
+}
+// Chat attachments are readable by conversation members and Admin reviewers only.
+export async function downloadConversationFile(token: string, path: string) {
+  const parts = parseChatPath(path);
+  if (!parts) throw Error("File unavailable");
+  return transaction(async (c) => {
+    const profile = await checkedUser(c, token);
+    await c.query("set local role techly_user");
+    const access = await c.query(
+      "select (private.is_member($1) or private.can_review($1)) as allowed, exists(select 1 from public.messages m where m.conversation_id=$1 and m.attachment_path=$2 and m.deleted_at is null) as referenced",
+      [parts.conversation, path],
+    );
+    await c.query("set local role techly_service");
+    const row = access.rows[0];
+    // Files not attached to a live message stay private to their uploader.
+    if (!row?.allowed || !(row.referenced || parts.uploader === profile.id))
+      throw Error("Permission denied");
+    const { rows } = await c.query(
+      "select name,mime,size,content from private.stored_files where path=$1",
+      [path],
+    );
+    if (!rows.length) throw Error("File unavailable");
+    return rows[0] as {
+      name: string;
+      mime: string;
+      size: number;
+      content: Buffer;
+    };
   });
 }
 export async function downloadFile(

@@ -3,6 +3,7 @@ import { context, grants, allowed } from "@/lib/database";
 import { modules } from "@/lib/modules";
 import { NotificationListener } from "@/components/notification-listener";
 import type { Preferences } from "@/components/notifications";
+import type { CompanySettings } from "@/components/settings";
 export const dynamic = "force-dynamic";
 export default async function WorkspaceLayout({
   children,
@@ -10,7 +11,7 @@ export default async function WorkspaceLayout({
   children: React.ReactNode;
 }) {
   const { db, profile } = await context();
-  const [permissions, notifications, prefs] = await Promise.all([
+  const [permissions, notifications, prefs, settings] = await Promise.all([
     grants(db),
     db.select<{ id: string }>(
       "notifications",
@@ -20,7 +21,12 @@ export default async function WorkspaceLayout({
       "notification_preferences",
       "select=data&user_id=eq." + profile.id,
     ),
+    db.select<{ data: Pick<CompanySettings, "sounds" | "notification_channels"> }>(
+      "settings",
+      "select=data&id=eq.1",
+    ),
   ]);
+  const company = settings[0]?.data;
   return (
     <AppFrame
       profile={profile}
@@ -33,6 +39,17 @@ export default async function WorkspaceLayout({
       <NotificationListener
         preferences={
           prefs[0]?.data || { muted: false, volume: 0.5, categories: {} }
+        }
+        companySounds={
+          company?.sounds || { default: "builtin:chime", categories: {} }
+        }
+        channels={
+          company?.notification_channels || {
+            in_app: true,
+            sound: true,
+            push: true,
+            email: true,
+          }
         }
       />
     </AppFrame>

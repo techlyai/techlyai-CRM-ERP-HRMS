@@ -2,6 +2,9 @@ import { LogoMark } from "@/components/logo";
 export default function Loading() {
   return (
     <div aria-busy="true" aria-label="Loading workspace">
+      <p role="status" className="sr-only">
+        Loading your workspace…
+      </p>
       <div className="mb-8 flex items-center gap-3">
         <LogoMark size={20} className="animate-pulse" />
         <div className="h-8 w-64 animate-pulse rounded-lg bg-muted" />

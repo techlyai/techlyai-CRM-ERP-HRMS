@@ -2,7 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Techly design tokens. Every colour in the app derives from these. */
+/* Orbit design tokens. Every colour in the app derives from these. */
 :root {
   --background: 210 40% 98%;
   --foreground: 222 47% 11%;

@@ -27,7 +27,10 @@ export default async function ModulePage({
     return (
       <p className="error">You do not have permission to view this module.</p>
     );
-  const page = Math.max(1, Math.min(10000, Number(searchParams.page) || 1));
+  const page = Math.max(
+    1,
+    Math.min(10000, Math.floor(Number(searchParams.page) || 1)),
+  );
   const q = (searchParams.q || "")
     .replace(/[^\p{L}\p{N} @.+-]/gu, "")
     .slice(0, 100);
@@ -50,31 +53,41 @@ export default async function ModulePage({
   }
   let children: React.ReactNode;
   if (module === "attendance") {
+    const settings = await db.select<{
+      data: {
+        timezone: string;
+        holidays: string[];
+        working_days: number[];
+        special_days?: { date: string; working: boolean }[];
+      };
+    }>("settings", "select=data&id=eq.1");
+    const company = settings[0].data;
+    const timezone = company.timezone || "Asia/Kolkata";
+    const todayDate = localDate(new Date(), timezone);
     const month = /^\d{4}-(0[1-9]|1[0-2])$/.test(searchParams.month || "")
       ? searchParams.month!
-      : localDate().slice(0, 7);
-    const [today, monthRecords, settings] = await Promise.all([
+      : todayDate.slice(0, 7);
+    const [today, monthRecords] = await Promise.all([
       db.select<BusinessRecord>(
         "records",
-        `select=*&module=eq.attendance&owner_id=eq.${profile.id}&data->>date=eq.${localDate()}`,
+        `select=*&module=eq.attendance&owner_id=eq.${profile.id}&data->>date=eq.${todayDate}`,
       ),
       db.select<BusinessRecord>(
         "records",
         `select=*&module=eq.attendance&owner_id=eq.${profile.id}&data->>date=gte.${month}-01&data->>date=lte.${month}-31&limit=31`,
       ),
-      db.select<{ data: { holidays: string[]; working_days: number[] } }>(
-        "settings",
-        "select=data&id=eq.1",
-      ),
     ]);
     children = (
       <>
-        <Attendance today={today[0]} />
+        <Attendance today={today[0]} timezone={timezone} />
         <AttendanceCalendar
           month={month}
           records={monthRecords}
-          holidays={settings[0].data.holidays}
-          workingDays={settings[0].data.working_days}
+          holidays={company.holidays}
+          workingDays={company.working_days}
+          specialDays={company.special_days || []}
+          today={todayDate}
+          timezone={timezone}
         />
       </>
     );
