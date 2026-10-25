@@ -41,6 +41,7 @@ export const notificationCategories: { key: string; label: string; group: string
   { key: "tasks", label: "Task deadlines", group: "Work" },
   { key: "projects", label: "Project updates", group: "Work" },
   { key: "attendance", label: "Attendance", group: "Work" },
+  { key: "field", label: "Field operations & GPS photos", group: "Work" },
   { key: "maintenance", label: "Asset maintenance", group: "Operations" },
   { key: "stock", label: "Low stock", group: "Operations" },
 ];

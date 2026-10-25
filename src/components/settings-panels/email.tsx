@@ -34,6 +34,7 @@ const events = [
   ["payments", "Payments", "Payment and outstanding balance updates."],
   ["tasks", "Tasks", "Task assignments and progress updates."],
   ["chat", "Chat", "Team conversation notifications."],
+  ["field", "Field operations", "Field sessions, GPS photo checks and field reports. Never includes coordinates."],
 ] as const;
 const statusLabels: Record<string, string> = {
   queued: "Queued",

@@ -49,14 +49,16 @@ export function LoginForm({
     >
       {!change && (
         <div>
-          <label htmlFor="phone">Phone number</label>
+          <label htmlFor="phone">Username or phone number</label>
           <input
             id="phone"
             name="phone"
-            type="tel"
-            inputMode="tel"
+            type="text"
             autoComplete="username"
-            placeholder="+91 98765 43210"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            placeholder="Username or +91 98765 43210"
             required
             disabled={!configured}
             className="h-11"

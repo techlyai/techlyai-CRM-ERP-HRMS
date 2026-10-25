@@ -1,8 +1,11 @@
 import { notFound } from "next/navigation";
-import { context, grants, allowed, referencesFor } from "@/lib/database";
+import { context, grants, allowed, referencesFor, scopeOf } from "@/lib/database";
 import { moduleMap, type BusinessRecord, type Profile } from "@/lib/modules";
 import { ModuleList } from "@/components/module-list";
-import { Attendance } from "@/components/attendance";
+import { AttendanceCard } from "@/components/attendance-card";
+import { AttendanceOverview } from "@/components/attendance-overview";
+import { attendanceCardData, summarizeMonth, type OverviewRow } from "@/lib/attendance";
+import { formatHours } from "@/lib/geo";
 import { localDate } from "@/lib/domain";
 import { type Reference } from "@/components/record-form";
 import { AttendanceCalendar } from "@/components/attendance-calendar";
@@ -17,6 +20,8 @@ export default async function ModulePage({
     status?: string;
     new?: string;
     month?: string;
+    date?: string;
+    attendance?: string;
   };
 }) {
   const { module } = params;
@@ -67,11 +72,16 @@ export default async function ModulePage({
     const month = /^\d{4}-(0[1-9]|1[0-2])$/.test(searchParams.month || "")
       ? searchParams.month!
       : todayDate.slice(0, 7);
-    const [today, monthRecords] = await Promise.all([
-      db.select<BusinessRecord>(
-        "records",
-        `select=*&module=eq.attendance&owner_id=eq.${profile.id}&data->>date=eq.${todayDate}`,
-      ),
+    const canCheckIn = allowed(profile, permissions, "attendance", "create");
+    // Reviewers (any scope beyond their own records) also get the team overview.
+    const reviewer = ["team", "department", "all"].includes(scopeOf(profile, permissions, "attendance", "view"));
+    const date =
+      /^d{4}-d{2}-d{2}$/.test(searchParams.date || "") && searchParams.date! <= todayDate
+        ? searchParams.date!
+        : todayDate;
+    const [card, overview, monthRecords] = await Promise.all([
+      attendanceCardData(db, profile, timezone),
+      reviewer ? db.rpc<OverviewRow[]>("attendance_overview", { p_date: date }) : Promise.resolve([] as OverviewRow[]),
       db.select<BusinessRecord>(
         "records",
         `select=*&module=eq.attendance&owner_id=eq.${profile.id}&data->>date=gte.${month}-01&data->>date=lte.${month}-31&limit=31`,
@@ -79,7 +89,17 @@ export default async function ModulePage({
     ]);
     children = (
       <>
-        <Attendance today={today[0]} timezone={timezone} />
+        {canCheckIn && (
+          <AttendanceCard
+            {...card}
+            canCheckIn
+            canCheckOut={allowed(profile, permissions, "attendance", "edit")}
+            canRequestCorrection={allowed(profile, permissions, "corrections", "create")}
+            showHistoryLink={false}
+          />
+        )}
+        <MonthSummary records={monthRecords} today={todayDate} month={month} />
+        {reviewer && <AttendanceOverview rows={overview} date={date} today={todayDate} timezone={timezone} />}
         <AttendanceCalendar
           month={month}
           records={monthRecords}
@@ -140,8 +160,41 @@ export default async function ModulePage({
       q={q}
       status={status}
       newRecord={searchParams.new === "1"}
+      prefill={
+        module === "corrections" && /^[0-9a-f-]{36}$/i.test(searchParams.attendance || "")
+          ? { attendance_id: searchParams.attendance! }
+          : undefined
+      }
     >
       {children}
     </ModuleList>
+  );
+}
+
+function MonthSummary({ records, today, month }: { records: BusinessRecord[]; today: string; month: string }) {
+  const s = summarizeMonth(records, today);
+  const label = new Date(month + "-01T00:00:00").toLocaleDateString("en-IN", { month: "long", year: "numeric" });
+  return (
+    <section aria-label={`Your attendance in ${label}`} className="mb-6">
+      <h2 className="section-title mb-3">Your month · {label}</h2>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-7">
+        {(
+          [
+            ["Present", s.present],
+            ["Late", s.late],
+            ["Half-day", s.halfDay],
+            ["Work from home", s.wfh],
+            ["Missing check-outs", s.missingCheckout],
+            ["Location not verified", s.unverified],
+            ["Hours worked", formatHours(s.hours)],
+          ] as [string, number | string][]
+        ).map(([k, v]) => (
+          <div key={k} className="panel p-3">
+            <p className="text-[11px] text-muted-foreground">{k}</p>
+            <p className="mt-1 text-lg font-semibold tabular-nums">{v}</p>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }

@@ -1,0 +1,10 @@
+{
+  "_note": "Development and testing accounts created by `npm run seed:dev-accounts`. Passwords are not stored here: the seed uses DEV_ACCOUNT_PASSWORD (default 123 outside production). Phones are placeholders and must be unique.",
+  "accounts": [
+    { "username": "superadmin", "name": "Super Admin", "role": "super_admin", "phone": "+910000000001" },
+    { "username": "admin", "name": "Admin", "role": "manager", "phone": "+910000000002", "department": "Operations" },
+    { "username": "employee1", "name": "Employee 1", "role": "employee", "phone": "+910000000011", "department": "Operations", "manager": "admin" },
+    { "username": "employee2", "name": "Employee 2", "role": "employee", "phone": "+910000000012", "department": "Operations", "manager": "admin" },
+    { "username": "employee3", "name": "Employee 3", "role": "employee", "phone": "+910000000013", "department": "Operations", "manager": "admin" }
+  ]
+}

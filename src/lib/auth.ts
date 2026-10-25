@@ -17,13 +17,30 @@ export async function sessionProfile(
   );
   return rows[0] || null;
 }
-export async function authenticate(phone: string, password: string) {
+/**
+ * Development accounts (seeded with a known weak password) may sign in only
+ * outside production, or when ALLOW_DEV_ACCOUNTS=true is set deliberately for
+ * an isolated test deployment.
+ */
+export function devAccountsAllowed() {
+  return (
+    process.env.NODE_ENV !== "production" ||
+    process.env.ALLOW_DEV_ACCOUNTS === "true"
+  );
+}
+/** Signs in with a phone number or a username. */
+export async function authenticate(
+  login: { phone: string } | { username: string },
+  password: string,
+) {
   const account = await transaction(
     async (c) =>
       (
         await c.query(
-          "select a.id,a.password_hash,p.active from private.accounts a join public.profiles p on p.id=a.id where p.phone=$1",
-          [phone],
+          "phone" in login
+            ? "select a.id,a.password_hash,a.weak_password,p.active from private.accounts a join public.profiles p on p.id=a.id where p.phone=$1"
+            : "select a.id,a.password_hash,a.weak_password,p.active from private.accounts a join public.profiles p on p.id=a.id where p.username=$1",
+          ["phone" in login ? login.phone : login.username],
         )
       ).rows[0],
   );
@@ -32,7 +49,11 @@ export async function authenticate(phone: string, password: string) {
     account?.password_hash || (await dummyHash),
   );
   if (!valid || !account?.active)
-    throw Error("Incorrect phone number or password.");
+    throw Error("Incorrect username, phone number or password.");
+  if (account.weak_password && !devAccountsAllowed())
+    throw Error(
+      "This development account is disabled in production. Ask an administrator to set a secure password.",
+    );
   const token = randomBytes(32).toString("hex");
   await transaction(async (c) => {
     // Recheck while locking the account so password resets cannot race session creation.
@@ -64,10 +85,10 @@ export async function replacePassword(token: string, password: string) {
   await transaction(async (c) => {
     const profile = await sessionProfile(c, token);
     if (!profile) throw Error("Please sign in again.");
-    await c.query("update private.accounts set password_hash=$1 where id=$2", [
-      hash,
-      profile.id,
-    ]);
+    await c.query(
+      "update private.accounts set password_hash=$1,weak_password=false,password_changed_at=now() where id=$2",
+      [hash, profile.id],
+    );
     await c.query(
       "update public.profiles set must_change_password=false where id=$1",
       [profile.id],
@@ -81,6 +102,31 @@ export async function replacePassword(token: string, password: string) {
       [profile.id],
     );
   });
+}
+/**
+ * Administrator password reset: the database authorizes the actor for this
+ * user, then a random temporary password replaces the old one. The user must
+ * choose their own password at next sign-in, and existing sessions end.
+ */
+export async function resetPasswordByAdmin(actorToken: string, userId: string) {
+  const password = randomBytes(18).toString("base64url") + "Aa1!";
+  const hash = await hashPassword(password);
+  await transaction(async (c) => {
+    const actor = await sessionProfile(c, actorToken);
+    if (!actor || actor.must_change_password) throw Error("Please sign in again.");
+    await c.query("select public.authorize_password_reset($1,$2)", [actor.id, userId]);
+    await c.query(
+      "update private.accounts set password_hash=$1,weak_password=false,password_changed_at=now() where id=$2",
+      [hash, userId],
+    );
+    await c.query("update public.profiles set must_change_password=true where id=$1", [userId]);
+    await c.query("delete from private.sessions where user_id=$1", [userId]);
+    await c.query(
+      "insert into public.history(actor_id,action,snapshot) values($1,'Password reset by administrator',$2)",
+      [actor.id, JSON.stringify({ user_id: userId })],
+    );
+  });
+  return password;
 }
 export async function provisionUser(
   actorToken: string,

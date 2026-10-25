@@ -9,6 +9,7 @@ import { RecordDetails, type Question } from "@/components/record-details";
 import { type Reference } from "@/components/record-form";
 import { type Attachment } from "@/components/attachments";
 import { ProjectActivity } from "@/components/project-activity";
+import { AttendanceLocationDetails } from "@/components/attendance-overview";
 import { CredentialsPanel } from "@/components/credentials/credentials-panel";
 import type { Credential } from "@/lib/credentials";
 import { vaultConfigured } from "@/lib/vault";
@@ -162,6 +163,19 @@ export default async function Detail({
         credentials={credentialsTab}
         initialTab={searchParams?.tab}
       />
+      {params.module === "attendance" && r.data.clock_in ? (
+        <section className="panel mt-6 p-5" aria-labelledby="attendance-location">
+          <h2 id="attendance-location" className="section-title">Check-in and check-out locations</h2>
+          <AttendanceLocationDetails
+            data={r.data}
+            original={(r.data.original as Record<string, unknown>) || null}
+            timezone={
+              (await db.select<{ data: { timezone?: string } }>("settings", "select=data&id=eq.1"))[0]?.data.timezone ||
+              "Asia/Kolkata"
+            }
+          />
+        </section>
+      ) : null}
       {params.module === "projects" && (
         <ProjectActivity
           records={related}

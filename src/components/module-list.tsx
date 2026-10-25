@@ -34,6 +34,7 @@ export function ModuleList({
   q,
   status,
   newRecord,
+  prefill,
   children,
 }: {
   module: string;
@@ -48,6 +49,8 @@ export function ModuleList({
   q: string;
   status: string;
   newRecord: boolean;
+  /** Initial field values for a new record opened from a link. */
+  prefill?: Record<string, string>;
   children?: React.ReactNode;
 }) {
   const router = useRouter();
@@ -129,6 +132,7 @@ export function ModuleList({
               references={references}
               canAssign={canAssign}
               defaultOpen={newRecord}
+              prefill={prefill}
             />
           )}
         </div>

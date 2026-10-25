@@ -35,6 +35,7 @@ import {
   BellRing,
   MessageSquare,
   KeyRound,
+  MapPinned,
 } from "lucide-react";
 import { modules, type Profile } from "@/lib/modules";
 import { roleLabel } from "@/lib/roles";
@@ -70,14 +71,14 @@ export function AppFrame({
   profile,
   visible,
   unread,
-  features = { users: false, audit: false, permissions: false, chat: true },
+  features = { users: false, audit: false, permissions: false, chat: true, field: false },
 }: {
   children: React.ReactNode;
   profile: Profile;
   visible: string[];
   unread: number;
   /** Administrative areas this person may open; enforced again on each page. */
-  features?: { users: boolean; audit: boolean; permissions: boolean; chat: boolean };
+  features?: { users: boolean; audit: boolean; permissions: boolean; chat: boolean; field?: boolean };
 }) {
   const pathname = usePathname();
   const [mobile, setMobile] = useState(false);
@@ -269,6 +270,7 @@ export function AppFrame({
               Workspace
             </div>
           )}
+          {features.field && nav("/field", "Field operations", MapPinned)}
           {nav("/reminders", "Reminders", BellRing)}
           {features.chat && nav("/chat", "Chat", MessageSquare)}
           {nav("/notifications", "Notifications", Bell)}
@@ -282,6 +284,7 @@ export function AppFrame({
           !matchingModules.length &&
           ![
             "Overview",
+            ...(features.field ? ["Field operations"] : []),
             "Reminders",
             ...(features.chat ? ["Chat"] : []),
             "Notifications",

@@ -18,6 +18,8 @@ export type UploadInfo = {
   conversation?: string;
   /** "joining" marks an employee's combined joining-documents PDF. */
   kind?: FileKind;
+  /** Field photo or field report id, for the field_* kinds. */
+  fieldTarget?: string;
   name: string;
   mime: string;
   size: number;
@@ -54,6 +56,13 @@ async function recordPermission(
   if (!rows.length) throw Error("Record unavailable or permission denied");
   return rows[0] as { id: string; module: string };
 }
+// Field photos and report files: the database checks ownership and state.
+async function fieldTarget(c: PoolClient, kind: FileKind, target: string, mime: string, size: number) {
+  await c.query("set local role techly_user");
+  const { rows } = await c.query("select public.field_upload_allowed($1,$2,$3,$4) ok", [kind, target, mime, size]);
+  await c.query("set local role techly_service");
+  if (!rows[0]?.ok) throw Error("This photo or report can no longer receive files");
+}
 // Chat uploads require current membership; RLS on conversation_members enforces it.
 async function conversationMembership(c: PoolClient, conversation: string) {
   await c.query("set local role techly_user");
@@ -73,7 +82,11 @@ export async function startUpload(token: string, info: UploadInfo) {
     throw Error("Use JPG, PNG, WebP, PDF, DOCX, XLSX, or CSV files in chat.");
   if (kind === "joining" && (info.sound || info.conversation || !info.record))
     throw Error("Joining documents belong to an employee record");
-  if (!info.sound && !info.record && !info.conversation)
+  const field = kind === "field_photo" || kind === "field_report";
+  if (field && (info.sound || info.conversation || info.record || !info.fieldTarget))
+    throw Error("Field files belong to a field photo or report");
+  if (!field && info.fieldTarget) throw Error("Invalid upload target");
+  if (!field && !info.sound && !info.record && !info.conversation)
     throw Error("Select a record");
   return transaction(async (c) => {
     const profile = await checkedUser(c, token);
@@ -83,30 +96,33 @@ export async function startUpload(token: string, info: UploadInfo) {
     ]);
     await c.query("delete from private.uploads where expires_at<=now()");
     const { rows } = await c.query(
-      "select coalesce(sum(size) filter(where kind='general'),0) as bytes,count(*) as count from private.uploads where user_id=$1",
+      "select coalesce(sum(size) filter(where kind<>'joining'),0) as bytes,count(*) as count from private.uploads where user_id=$1",
       [profile.id],
     );
     // Joining PDFs have no size quota; the pending-upload count still applies.
     if (
-      (kind === "general" &&
+      (kind !== "joining" &&
         Number(rows[0].bytes) + info.size > 100 * 1024 * 1024) ||
       Number(rows[0].count) >= 20
     )
       throw Error("Finish your pending uploads before adding more files.");
-    if (info.conversation) await conversationMembership(c, info.conversation);
+    if (field) await fieldTarget(c, kind, info.fieldTarget!, info.mime, info.size);
+    else if (info.conversation) await conversationMembership(c, info.conversation);
     else if (!info.sound) {
       const target = await recordPermission(c, info.record!, "upload");
       if (kind === "joining" && target.module !== "employees")
         throw Error("Joining documents belong to an employee record");
     }
-    const folder = info.sound
+    const folder = field
+      ? "field/" + info.fieldTarget
+      : info.sound
       ? "sounds"
       : info.conversation
         ? "chat/" + info.conversation
         : info.record;
     const path = `${profile.id}/${folder}/${randomUUID()}.${info.name.split(".").pop()!.toLowerCase()}`;
     const result = await c.query(
-      "insert into private.uploads(user_id,record_id,conversation_id,path,name,mime,size,sound,kind) values($1,$2,$3,$4,$5,$6,$7,$8,$9) returning id",
+      "insert into private.uploads(user_id,record_id,conversation_id,path,name,mime,size,sound,kind,field_target) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) returning id",
       [
         profile.id,
         info.sound || info.conversation ? null : info.record,
@@ -117,6 +133,7 @@ export async function startUpload(token: string, info: UploadInfo) {
         info.size,
         Boolean(info.sound),
         kind,
+        field ? info.fieldTarget : null,
       ],
     );
     return { id: result.rows[0].id as string, path, chunkSize: CHUNK_SIZE };
@@ -168,7 +185,9 @@ export async function finishUpload(token: string, id: string) {
     if (!upload) throw Error("Upload expired or already completed");
     const size = Number(upload.size);
     const kind: FileKind = upload.kind || "general";
-    if (upload.conversation_id)
+    const field = kind === "field_photo" || kind === "field_report";
+    if (field) await fieldTarget(c, kind, upload.field_target, upload.mime, size);
+    else if (upload.conversation_id)
       await conversationMembership(c, upload.conversation_id);
     else if (!upload.sound)
       await recordPermission(c, upload.record_id, "upload");
@@ -233,7 +252,18 @@ export async function finishUpload(token: string, id: string) {
         [upload.path, id],
       );
     }
-    if (!upload.sound && !upload.conversation_id) {
+    if (field) {
+      await c.query("set local role techly_user");
+      await c.query("select public.field_attach_upload($1,$2,$3,$4,$5,$6)", [
+        kind,
+        upload.field_target,
+        upload.path,
+        upload.name,
+        upload.mime,
+        size,
+      ]);
+      await c.query("set local role techly_service");
+    } else if (!upload.sound && !upload.conversation_id) {
       await c.query("set local role techly_user");
       await c.query("select public.attach_file($1,$2,$3,$4,$5,$6)", [
         upload.record_id,
@@ -298,6 +328,22 @@ export async function downloadConversationFile(token: string, path: string) {
     if (!row?.allowed || !(row.referenced || parts.uploader === profile.id))
       throw Error("Permission denied");
     return loadStored(c, path);
+  });
+}
+/** A field photo or report file; row level security decides who may read it. */
+export async function downloadFieldFile(token: string, kind: "photo" | "report", id: string) {
+  return transaction(async (c) => {
+    await checkedUser(c, token);
+    await c.query("set local role techly_user");
+    const { rows } = await c.query(
+      kind === "photo"
+        ? "select file_path as path from public.field_photos where id=$1 and file_path is not null"
+        : "select path from public.field_report_files where id=$1",
+      [id],
+    );
+    await c.query("set local role techly_service");
+    if (!rows.length) throw Error("File unavailable");
+    return loadStored(c, rows[0].path);
   });
 }
 export async function downloadFile(

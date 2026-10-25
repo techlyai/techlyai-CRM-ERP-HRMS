@@ -24,6 +24,7 @@ export function RecordForm({
   record,
   defaultOpen = false,
   canAssign = false,
+  prefill,
 }: {
   module: string;
   people: Profile[];
@@ -31,6 +32,7 @@ export function RecordForm({
   record?: BusinessRecord;
   defaultOpen?: boolean;
   canAssign?: boolean;
+  prefill?: Record<string, string>;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(defaultOpen);
@@ -257,7 +259,7 @@ export function RecordForm({
                   </div>
                 )}
               {m.fields.map((field) => {
-                const value = record?.data[field.key];
+                const value = record ? record.data[field.key] : prefill?.[field.key];
                 const ref = refModule(field.key);
                 if (field.key === "team")
                   return (
