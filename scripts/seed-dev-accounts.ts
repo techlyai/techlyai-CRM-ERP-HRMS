@@ -5,7 +5,7 @@ import { transaction, pool } from "../src/lib/postgres";
 
 // Creates the development accounts listed in scripts/dev-accounts.json.
 // Idempotent: existing usernames are left alone (password included) unless
-// --reset-passwords is passed. Seeded accounts are flagged weak_password, so
+// --reset-passwords is passed. --only a,b limits creation and resets to those usernames. Seeded accounts are flagged weak_password, so
 // the server refuses them in production unless ALLOW_DEV_ACCOUNTS=true.
 type Account = {
   username: string;
@@ -36,11 +36,14 @@ async function main() {
     if (!a.name?.trim()) throw Error(`Missing name for ${a.username}`);
   }
   const reset = flag("reset-passwords");
+  const only = option("only") ? new Set(option("only")!.toLowerCase().split(",").map((u) => u.trim()).filter(Boolean)) : null;
+  for (const u of only || []) if (!accounts.some((a) => a.username === u)) throw Error(`--only: ${u} is not in ${file}`);
   const results = await transaction(async (c) => {
     await c.query("select pg_advisory_xact_lock(hashtext('techly-dev-accounts'))");
     const out: string[] = [];
     const ids = new Map<string, string>();
     for (const a of accounts) {
+      const selected = !only || only.has(a.username);
       const phone = normalizePhone(a.phone);
       const existing = (
         await c.query("select id from public.profiles where username=$1 or phone=$2", [a.username, phone])
@@ -49,7 +52,7 @@ async function main() {
       if (existing.length) {
         const id = existing[0].id as string;
         ids.set(a.username, id);
-        if (reset) {
+        if (reset && selected) {
           await c.query(
             "update private.accounts set password_hash=$2,weak_password=true,password_changed_at=now() where id=$1",
             [id, await hashPassword(password)],
@@ -58,6 +61,10 @@ async function main() {
           await c.query("delete from private.sessions where user_id=$1", [id]);
           out.push(`${a.username}: password reset`);
         } else out.push(`${a.username}: already exists, unchanged`);
+        continue;
+      }
+      if (!selected) {
+        out.push(`${a.username}: not in --only, skipped`);
         continue;
       }
       const { rows } = await c.query(
