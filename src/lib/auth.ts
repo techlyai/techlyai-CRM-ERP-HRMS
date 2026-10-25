@@ -96,8 +96,20 @@ export async function provisionUser(
   const hash = await hashPassword(password);
   return transaction(async (c) => {
     const actor = await sessionProfile(c, actorToken);
-    if (!actor || actor.must_change_password || actor.role !== "super_admin")
-      throw Error("Permission denied");
+    if (!actor || actor.must_change_password) throw Error("Permission denied");
+    // The database decides who may create which accounts and where they are placed:
+    // only Super Admins create Admins; Admins with Create users add Employees within their reach.
+    const placement = (
+      await c.query(
+        "select public.authorize_user_creation($1,$2,$3,$4) as p",
+        [actor.id, input.role, input.department || null, input.manager || null],
+      )
+    ).rows[0].p as { department: string | null; manager: string | null };
+    input = {
+      ...input,
+      department: placement.department || undefined,
+      manager: placement.manager || undefined,
+    };
     const { rows } = await c.query(
       "insert into private.accounts(password_hash) values($1) returning id",
       [hash],

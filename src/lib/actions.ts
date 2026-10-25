@@ -1,5 +1,5 @@
 "use server";
-import { context, serviceDB, setSession } from "./database";
+import { context, serviceDB, setSession, requirePermission } from "./database";
 import {
   authenticate,
   revokeSession,
@@ -360,8 +360,8 @@ export async function subscribePush(subscription: unknown): Promise<Result> {
 }
 export async function saveSettings(data: unknown): Promise<Result> {
   return safely(async () => {
-    const { db, profile } = await context();
-    if (profile.role !== "super_admin") throw Error("Permission denied");
+    // Each changed settings group is authorized by update_settings in the database.
+    const { db } = await context();
     const time = z
       .string()
       .regex(/^\d{2}:\d{2}$/)
@@ -512,8 +512,7 @@ export async function createUser(input: {
   email?: string;
 }): Promise<Result> {
   return safely(async () => {
-    const { db, profile, token } = await context();
-    if (profile.role !== "super_admin") throw Error("Permission denied");
+    const { db, token } = await context();
     const phone = normalizePhone(input.phone);
     const name = z.string().min(1).max(200).parse(input.name);
     const role = z
@@ -665,8 +664,8 @@ const strongPassword = z
 /** Admin: issues a fresh activation link and queues the welcome email again. */
 export async function resendInvite(userId: string): Promise<Result> {
   return safely(async () => {
-    const { profile } = await context();
-    if (profile.role !== "super_admin") throw Error("Permission denied");
+    const { db } = await context();
+    await requirePermission(db, "users", "edit", uuid.parse(userId));
     const result = await sendWelcomeInvite(uuid.parse(userId));
     if (!result.queued)
       throw Error(result.reason || "The invite could not be queued");

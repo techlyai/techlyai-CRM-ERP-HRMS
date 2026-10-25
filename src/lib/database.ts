@@ -149,11 +149,48 @@ export function allowed(
     ) ||
     permissions.find(
       (g) =>
-        g.role === profile.role && g.module === module && g.action === action,
+        !g.user_id &&
+        g.role === profile.role &&
+        g.module === module &&
+        g.action === action,
     );
   return Boolean(
     grant &&
       grant.scope !== "none" &&
       (grant.scope !== "self" || owner === profile.id),
   );
+}
+/** Throws unless the database grants the signed-in user this permission for `owner`. */
+export async function requirePermission(
+  db: Database,
+  module: string,
+  action: string,
+  owner?: string,
+) {
+  const ok = await db.run(async (c) =>
+    owner
+      ? (await c.query("select private.permitted($1,$2,$3::uuid) ok", [module, action, owner])).rows[0].ok
+      : (await c.query("select private.has_feature($1,$2) ok", [module, action])).rows[0].ok,
+  );
+  if (!ok) throw Error("You do not have permission to do this");
+}
+/**
+ * Whether a feature permission (Users, Settings, Audit, Chat, Credentials …) is
+ * granted at any scope. A UI hint only: the database enforces every action.
+ */
+export function can(
+  profile: Profile,
+  permissions: Awaited<ReturnType<typeof grants>>,
+  module: string,
+  action: string,
+) {
+  if (profile.role === "super_admin") return true;
+  const own = permissions.find(
+    (g) => g.user_id === profile.id && g.module === module && g.action === action,
+  );
+  const role = permissions.find(
+    (g) => !g.user_id && g.role === profile.role && g.module === module && g.action === action,
+  );
+  const grant = own || role;
+  return Boolean(grant && grant.scope !== "none");
 }

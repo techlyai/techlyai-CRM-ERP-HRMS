@@ -1,219 +1,163 @@
 "use client";
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Plus, ShieldCheck } from "lucide-react";
-import { type Profile, modules, actions } from "@/lib/modules";
-import { createUser, updateProfile, setPermission } from "@/lib/actions";
+import { KeyRound, Plus, Search, ShieldCheck } from "lucide-react";
+import { type Profile } from "@/lib/modules";
+import { createUser, updateProfile } from "@/lib/actions";
+import { roleLabel } from "@/lib/roles";
 import { Button } from "./ui/button";
 import { Dialog, DialogContent } from "./ui/dialog";
+
+type Person = Profile & { email?: string | null; employee_id?: string | null; phone?: string };
+
 export function Users({
   people,
-  permissions,
+  me,
+  abilities,
 }: {
-  people: Profile[];
-  permissions: {
-    id: string;
-    user_id: string | null;
-    role: string | null;
-    module: string;
-    action: string;
-    scope: string;
-  }[];
+  people: Person[];
+  me: { id: string; role: Profile["role"] };
+  /** What the signed-in person may do here; the database re-checks every action. */
+  abilities: { create: boolean; edit: boolean; permissions: boolean };
 }) {
   const router = useRouter();
+  const superAdmin = me.role === "super_admin";
   const [open, setOpen] = useState(false);
-  const [edit, setEdit] = useState<Profile>();
+  const [edit, setEdit] = useState<Person>();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [password, setPassword] = useState("");
-  const [scopeTarget, setScopeTarget] = useState("manager");
+  const [created, setCreated] = useState<{ id: string; name: string; password: string } | null>(null);
+  const [query, setQuery] = useState("");
+  const [role, setRole] = useState("");
+  const q = query.trim().toLowerCase();
+  const list = people.filter(
+    (p) =>
+      (!q ||
+        p.full_name.toLowerCase().includes(q) ||
+        (p.employee_id || "").toLowerCase().includes(q) ||
+        (p.phone || "").includes(q)) &&
+      (!role || p.role === role),
+  );
   return (
     <>
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold">Users & access</h1>
           <p className="mt-2 text-sm text-muted-foreground">
             The right access, for the right people.
           </p>
         </div>
-        <Button
-          onClick={() => {
-            setEdit(undefined);
-            setPassword("");
-            setError("");
-            setOpen(true);
-          }}
-        >
-          <Plus size={14} />
-          New user
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          {abilities.permissions && (
+            <Button variant="outline" asChild>
+              <Link href="/settings/roles">
+                <KeyRound size={14} /> Roles & permissions
+              </Link>
+            </Button>
+          )}
+          {abilities.create && (
+            <Button
+              onClick={() => {
+                setEdit(undefined);
+                setCreated(null);
+                setError("");
+                setOpen(true);
+              }}
+            >
+              <Plus size={14} /> New user
+            </Button>
+          )}
+        </div>
       </div>
       {error && !open && <p className="error mb-5">{error}</p>}
-      {password && !open && (
-        <p role="status" className="mb-5 rounded-lg border p-4 text-sm">
-          User created. Temporary password:{" "}
-          <code className="font-bold">{password}</code>
-          <br />
-          Share this securely with the employee. It is shown only in this
-          session.
-        </p>
+      {created && !open && (
+        <div role="status" className="mb-5 rounded-xl border border-success/30 bg-success/5 p-4 text-sm">
+          <p className="font-semibold">{created.name} was created with the default permissions for their role.</p>
+          <p className="mt-2 text-xs">
+            Temporary password: <code className="rounded bg-muted px-1.5 py-0.5 font-bold">{created.password}</code>. Share it securely; it is shown only once.
+          </p>
+          {abilities.permissions && (
+            <Button size="sm" className="mt-3" asChild>
+              <Link href={`/settings/roles?user=${created.id}`}>
+                <ShieldCheck size={13} /> Review and customize permissions
+              </Link>
+            </Button>
+          )}
+        </div>
       )}
+      <div className="panel mb-4 flex flex-col gap-3 p-3 sm:flex-row">
+        <label className="relative flex-1">
+          <span className="sr-only">Search users</span>
+          <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search name, employee ID or phone" className="h-10 pl-9" />
+        </label>
+        <select aria-label="Filter by role" value={role} onChange={(e) => setRole(e.target.value)} className="h-10 sm:w-44">
+          <option value="">All roles</option>
+          <option value="super_admin">Super Admin</option>
+          <option value="manager">Admin</option>
+          <option value="employee">Employee</option>
+        </select>
+      </div>
       <section className="panel overflow-x-auto">
-        <table className="w-full text-left text-xs">
+        <table className="w-full min-w-[720px] text-left text-xs">
           <thead className="bg-muted/40 text-muted-foreground">
             <tr>
-              {[
-                "Employee",
-                "Phone",
-                "Role",
-                "Department",
-                "Reporting manager",
-                "Status",
-                "",
-              ].map((t) => (
-                <th className="p-4" key={t}>
-                  {t}
-                </th>
+              {["Person", "Phone", "Role", "Department", "Reporting manager", "Status", ""].map((t) => (
+                <th className="p-4 font-medium" key={t}>{t}</th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {people.map((p) => (
+            {list.map((p) => (
               <tr key={p.id} className="border-t">
-                <td className="p-4 font-medium">{p.full_name}</td>
-                <td className="p-4">{p.phone}</td>
-                <td className="p-4 capitalize">{p.role.replace("_", " ")}</td>
-                <td className="p-4">{p.department || "—"}</td>
                 <td className="p-4">
-                  {people.find((m) => m.id === p.manager_id)?.full_name || "—"}
+                  <span className="block font-medium">{p.full_name}</span>
+                  {p.employee_id && <span className="text-[11px] text-muted-foreground">{p.employee_id}</span>}
                 </td>
-                <td className="p-4">{p.active ? "Active" : "Inactive"}</td>
+                <td className="p-4">{p.phone}</td>
                 <td className="p-4">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      setEdit(p);
-                      setError("");
-                      setOpen(true);
-                    }}
-                  >
-                    Manage
-                  </Button>
+                  <span className={`rounded px-1.5 py-0.5 text-[11px] ${p.role === "super_admin" ? "bg-primary/15 text-primary" : p.role === "manager" ? "bg-accent/15 text-accent" : "bg-muted text-muted-foreground"}`}>
+                    {roleLabel(p.role)}
+                  </span>
+                </td>
+                <td className="p-4">{p.department || "—"}</td>
+                <td className="p-4">{people.find((m) => m.id === p.manager_id)?.full_name || "—"}</td>
+                <td className="p-4">{p.active ? "Active" : <span className="text-danger">Inactive</span>}</td>
+                <td className="p-4">
+                  <div className="flex justify-end gap-2">
+                    {abilities.edit && (superAdmin || p.role !== "super_admin") && (
+                      <Button size="sm" variant="outline" onClick={() => { setEdit(p); setError(""); setOpen(true); }}>
+                        Manage
+                      </Button>
+                    )}
+                    {abilities.permissions && p.role !== "super_admin" && (superAdmin || p.id !== me.id) && (
+                      <Button size="sm" variant="ghost" asChild>
+                        <Link href={`/settings/roles?user=${p.id}`}>
+                          <KeyRound size={13} /> Permissions
+                        </Link>
+                      </Button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}
+            {!list.length && (
+              <tr>
+                <td colSpan={7} className="p-8 text-center text-muted-foreground">No users match these filters.</td>
+              </tr>
+            )}
           </tbody>
         </table>
       </section>
-      <section className="panel mt-6 p-5">
-        <div className="flex items-center gap-2">
-          <ShieldCheck size={18} className="text-primary" />
-          <h2 className="section-title">Granular permissions</h2>
-        </div>
-        <p className="mt-2 text-xs leading-5 text-muted-foreground">
-          User overrides take priority over role defaults. Team access follows
-          each employee’s reporting manager. Managers start with no module
-          permissions until granted.
-        </p>
-        <form
-          className="mt-5 grid items-end gap-3 md:grid-cols-5"
-          onSubmit={async (e) => {
-            e.preventDefault();
-            setBusy(true);
-            const f = new FormData(e.currentTarget);
-            const target = String(f.get("target"));
-            const r = await setPermission({
-              role: ["manager", "employee"].includes(target)
-                ? target
-                : undefined,
-              user: ["manager", "employee"].includes(target)
-                ? undefined
-                : target,
-              module: String(f.get("module")),
-              action: String(f.get("action")),
-              scope: String(f.get("scope")),
-            });
-            if (!r.ok) setError(r.error || "Failed");
-            else router.refresh();
-            setBusy(false);
-          }}
-        >
-          <div>
-            <label>User / role</label>
-            <select
-              name="target"
-              value={scopeTarget}
-              onChange={(e) => setScopeTarget(e.target.value)}
-            >
-              <option value="manager">Manager role</option>
-              <option value="employee">Employee role</option>
-              {people.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.full_name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label>Module</label>
-            <select name="module">
-              {modules.map((m) => (
-                <option key={m.key} value={m.key}>
-                  {m.title}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label>Action</label>
-            <select name="action">
-              {actions.map((a) => (
-                <option key={a}>{a}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label>Scope</label>
-            <select name="scope">
-              <option value="none">No access</option>
-              <option value="self">Own records</option>
-              <option value="team">Reporting team</option>
-              <option value="all">All records</option>
-            </select>
-          </div>
-          <Button disabled={busy}>Save permission</Button>
-        </form>
-        <div className="mt-6 max-h-96 overflow-auto">
-          <table className="w-full text-left text-xs">
-            <thead>
-              <tr>
-                <th className="py-3">Module</th>
-                <th>Action</th>
-                <th>Scope</th>
-              </tr>
-            </thead>
-            <tbody>
-              {permissions
-                .filter(
-                  (p) => p.role === scopeTarget || p.user_id === scopeTarget,
-                )
-                .map((p) => (
-                  <tr key={p.id} className="border-t">
-                    <td className="py-2">
-                      {modules.find((m) => m.key === p.module)?.title}
-                    </td>
-                    <td className="capitalize">{p.action}</td>
-                    <td>{p.scope}</td>
-                  </tr>
-                ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent
-          title={edit ? "Manage employee access" : "Create a user"}
+          title={edit ? `Manage ${edit.full_name}` : "Create a user"}
+          description={
+            edit
+              ? "Update profile details and account status. Use Permissions to change what this person can access."
+              : "New users start with the default permissions for their role. You can customize them right after creating the account."
+          }
         >
           <form
             className="mt-5 space-y-4"
@@ -224,87 +168,80 @@ export function Users({
               const f = new FormData(e.currentTarget);
               const input = {
                 name: String(f.get("name")),
-                department: String(f.get("department")),
+                department: String(f.get("department") || ""),
                 manager: String(f.get("manager") || ""),
-                role: String(f.get("role")),
+                role: String(f.get("role") || edit?.role || "employee"),
+                email: String(f.get("email") || ""),
               };
               const r = edit
-                ? await updateProfile({
-                    ...input,
-                    id: edit.id,
-                    active: f.get("active") === "on",
-                  })
+                ? await updateProfile({ ...input, id: edit.id, active: f.get("active") === "on" })
                 : await createUser({ ...input, phone: String(f.get("phone")) });
-              if (!r.ok) setError(r.error || "Failed");
-              else {
-                if (r.message) setPassword(r.message);
-                setOpen(false);
-                router.refresh();
-              }
               setBusy(false);
+              if (!r.ok) return setError(r.error || "Failed");
+              if (!edit && r.message && r.id) setCreated({ id: r.id, name: input.name, password: r.message });
+              setOpen(false);
+              router.refresh();
             }}
           >
-            <div>
-              <label>Full name *</label>
-              <input name="name" defaultValue={edit?.full_name} required />
-            </div>
-            {!edit && (
+            <div className="grid gap-4 sm:grid-cols-2">
               <div>
-                <label>Phone number *</label>
-                <input
-                  name="phone"
-                  type="tel"
-                  required
-                  placeholder="+91 98765 43210"
-                />
+                <label htmlFor="u-name">Full name *</label>
+                <input id="u-name" name="name" defaultValue={edit?.full_name} required maxLength={200} />
               </div>
-            )}
-            <div>
-              <label>Role</label>
-              <select name="role" defaultValue={edit?.role || "employee"}>
-                <option value="employee">Employee</option>
-                <option value="manager">Department manager</option>
-                <option value="super_admin">Super Admin</option>
-              </select>
-            </div>
-            <div>
-              <label>Department</label>
-              <input name="department" defaultValue={edit?.department || ""} />
-            </div>
-            <div>
-              <label>Reporting manager</label>
-              <select name="manager" defaultValue={edit?.manager_id || ""}>
-                <option value="">Select manager</option>
-                {people
-                  .filter(
-                    (p) =>
-                      p.id !== edit?.id && p.active && p.role !== "employee",
-                  )
-                  .map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.full_name}
-                    </option>
-                  ))}
-              </select>
+              {!edit && (
+                <div>
+                  <label htmlFor="u-phone">Phone number *</label>
+                  <input id="u-phone" name="phone" type="tel" required placeholder="+91 98765 43210" />
+                </div>
+              )}
+              <div>
+                <label htmlFor="u-email">Email</label>
+                <input id="u-email" name="email" type="email" defaultValue={edit?.email || ""} placeholder="name@company.com" />
+              </div>
+              <div>
+                <label htmlFor="u-role">Role</label>
+                {superAdmin ? (
+                  <select id="u-role" name="role" defaultValue={edit?.role || "employee"}>
+                    <option value="employee">Employee</option>
+                    <option value="manager">Admin</option>
+                    <option value="super_admin">Super Admin</option>
+                  </select>
+                ) : (
+                  <>
+                    <input id="u-role" value={roleLabel(edit?.role || "employee")} readOnly disabled />
+                    <p className="mt-1 text-[11px] text-muted-foreground">Only a Super Admin can change roles.</p>
+                  </>
+                )}
+              </div>
+              <div>
+                <label htmlFor="u-dept">Department</label>
+                <input id="u-dept" name="department" defaultValue={edit?.department || ""} />
+              </div>
+              <div>
+                <label htmlFor="u-manager">Reporting manager</label>
+                <select id="u-manager" name="manager" defaultValue={edit?.manager_id || ""}>
+                  <option value="">No manager</option>
+                  {people
+                    .filter((p) => p.id !== edit?.id && p.active && p.role !== "employee")
+                    .map((p) => (
+                      <option key={p.id} value={p.id}>{p.full_name}</option>
+                    ))}
+                </select>
+              </div>
             </div>
             {edit && (
               <label className="flex items-center gap-2">
-                <input
-                  name="active"
-                  type="checkbox"
-                  defaultChecked={edit.active}
-                />
+                <input name="active" type="checkbox" defaultChecked={edit.active} disabled={edit.id === me.id && !superAdmin} />
                 Account active
               </label>
             )}
             {error && (
-              <p role="alert" className="error">
-                {error}
-              </p>
+              <p role="alert" className="error">{error}</p>
             )}
-            <Button disabled={busy}>
-              {busy ? "Saving…" : edit ? "Save user" : "Create user"}
-            </Button>
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+              <Button disabled={busy}>{busy ? "Saving…" : edit ? "Save user" : "Create user"}</Button>
+            </div>
           </form>
         </DialogContent>
       </Dialog>

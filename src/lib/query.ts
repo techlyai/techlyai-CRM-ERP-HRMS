@@ -29,6 +29,9 @@ const tables = new Set([
   "employee_id_sequences",
   "client_credentials",
   "credential_audit",
+  "permission_definitions",
+  "permission_audit",
+  "permission_templates",
 ]);
 export function identifier(value: string) {
   if (!/^[a-z_][a-z0-9_]*$/.test(value))

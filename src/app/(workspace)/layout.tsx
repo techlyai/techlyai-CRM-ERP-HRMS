@@ -1,5 +1,5 @@
 import { AppFrame } from "@/components/app-frame";
-import { context, grants, allowed } from "@/lib/database";
+import { context, grants, allowed, can } from "@/lib/database";
 import { modules } from "@/lib/modules";
 import { NotificationListener } from "@/components/notification-listener";
 import type { Preferences } from "@/components/notifications";
@@ -34,6 +34,12 @@ export default async function WorkspaceLayout({
         .filter((m) => allowed(profile, permissions, m.key, "view"))
         .map((m) => m.key)}
       unread={notifications.length}
+      features={{
+        users: can(profile, permissions, "users", "view"),
+        audit: can(profile, permissions, "audit", "view"),
+        permissions: can(profile, permissions, "users", "permissions"),
+        chat: can(profile, permissions, "chat", "view"),
+      }}
     >
       {children}
       <NotificationListener

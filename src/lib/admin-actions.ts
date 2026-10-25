@@ -1,7 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { context, serviceDB } from "./database";
+import { context, serviceDB, requirePermission } from "./database";
 import { processEmailQueue } from "./email";
 
 export type Result = { ok: boolean; error?: string; message?: string };
@@ -82,8 +82,8 @@ const emailSettingsSchema = z
 
 export async function saveEmailSettings(data: unknown): Promise<Result> {
   return safely(async () => {
-    const { db, profile } = await context();
-    if (profile.role !== "super_admin") throw Error("Permission denied");
+    const { db } = await context();
+    await requirePermission(db, "settings", "email");
     const s = emailSettingsSchema.parse(data);
     // An empty template means "use the built-in message", so drop it.
     const templates = Object.fromEntries(
@@ -113,8 +113,8 @@ export async function retryEmail(id: string): Promise<Result> {
  */
 export async function sendTestEmail(recipient: string): Promise<TestEmailResult> {
   return safely(async () => {
-    const { profile } = await context();
-    if (profile.role !== "super_admin") throw Error("Permission denied");
+    const { db, profile } = await context();
+    await requirePermission(db, "settings", "email");
     const to = z
       .string()
       .trim()
@@ -199,8 +199,8 @@ const employeeIdSchema = z
 
 export async function saveEmployeeIdSettings(data: unknown): Promise<Result> {
   return safely(async () => {
-    const { db, profile } = await context();
-    if (profile.role !== "super_admin") throw Error("Permission denied");
+    const { db } = await context();
+    await requirePermission(db, "settings", "employee_ids");
     const s = employeeIdSchema.parse(data);
     await db.rpc("update_employee_id_settings", { p_data: s });
     revalidatePath("/");

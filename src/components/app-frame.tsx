@@ -34,8 +34,10 @@ import {
   WifiOff,
   BellRing,
   MessageSquare,
+  KeyRound,
 } from "lucide-react";
 import { modules, type Profile } from "@/lib/modules";
+import { roleLabel } from "@/lib/roles";
 import { logout } from "@/lib/actions";
 import { unlockAlertSound } from "@/lib/audio";
 import { Logo } from "./logo";
@@ -68,11 +70,14 @@ export function AppFrame({
   profile,
   visible,
   unread,
+  features = { users: false, audit: false, permissions: false, chat: true },
 }: {
   children: React.ReactNode;
   profile: Profile;
   visible: string[];
   unread: number;
+  /** Administrative areas this person may open; enforced again on each page. */
+  features?: { users: boolean; audit: boolean; permissions: boolean; chat: boolean };
 }) {
   const pathname = usePathname();
   const [mobile, setMobile] = useState(false);
@@ -265,12 +270,12 @@ export function AppFrame({
             </div>
           )}
           {nav("/reminders", "Reminders", BellRing)}
-          {nav("/chat", "Chat", MessageSquare)}
+          {features.chat && nav("/chat", "Chat", MessageSquare)}
           {nav("/notifications", "Notifications", Bell)}
-          {profile.role === "super_admin" &&
-            nav("/users", "Users & access", ShieldCheck)}
-          {profile.role === "super_admin" &&
-            nav("/activity", "Activity & audit", FileText)}
+          {features.users && nav("/users", "Users & access", ShieldCheck)}
+          {features.permissions &&
+            nav("/settings/roles", "Roles & permissions", KeyRound)}
+          {features.audit && nav("/activity", "Activity & audit", FileText)}
           {nav("/settings", "Settings", Settings2)}
         </div>
         {term &&
@@ -278,12 +283,12 @@ export function AppFrame({
           ![
             "Overview",
             "Reminders",
-            "Chat",
+            ...(features.chat ? ["Chat"] : []),
             "Notifications",
             "Settings",
-            ...(profile.role === "super_admin"
-              ? ["Users & access", "Activity & audit"]
-              : []),
+            ...(features.users ? ["Users & access"] : []),
+            ...(features.permissions ? ["Roles & permissions"] : []),
+            ...(features.audit ? ["Activity & audit"] : []),
           ].some((label) => label.toLowerCase().includes(term)) && (
             <p
               role="status"
@@ -301,8 +306,8 @@ export function AppFrame({
             <div className="truncate text-xs font-semibold">
               {profile.full_name}
             </div>
-            <div className="mt-1 text-[10px] capitalize text-muted-foreground">
-              {profile.role.replace("_", " ")}
+            <div className="mt-1 text-[10px] text-muted-foreground">
+              {roleLabel(profile.role)}
             </div>
           </div>
           <button
@@ -420,7 +425,7 @@ export function AppFrame({
             {[
               ["/", "Overview", LayoutDashboard],
               ["/modules/tasks", "Tasks", CheckSquare],
-              ["/chat", "Chat", MessageSquare],
+              ...(features.chat ? [["/chat", "Chat", MessageSquare]] : []),
               ["/reminders", "Reminders", BellRing],
               ["/notifications", "Inbox", Bell],
             ]

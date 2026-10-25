@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -106,7 +107,12 @@ export function Settings({
   employeeIdSettings,
   employeeIdPreview,
   initialTab = "notifications",
+  allowedTabs,
+  canManageAccess = false,
 }: {
+  /** Tabs this person may open; each is enforced again when saving. */
+  allowedTabs?: SettingsTab[];
+  canManageAccess?: boolean;
   profile: Profile;
   settings: CompanySettings;
   preferences: Preferences;
@@ -174,7 +180,8 @@ export function Settings({
       </p>
       <div className="my-6 flex flex-wrap gap-3 border-b">
         {(
-          [
+          allowedTabs ||
+          ([
             "notifications",
             "sounds",
             ...(profile.role === "super_admin"
@@ -188,7 +195,7 @@ export function Settings({
                   "scheduler",
                 ]
               : []),
-          ] as SettingsTab[]
+          ] as SettingsTab[])
         ).map((t) => (
           <button
             key={t}
@@ -206,6 +213,14 @@ export function Settings({
             {t}
           </button>
         ))}
+        {canManageAccess && (
+          <Link
+            href="/settings/roles"
+            className="border-b-2 border-transparent px-3 pb-3 text-xs text-muted-foreground hover:text-foreground"
+          >
+            Roles & permissions
+          </Link>
+        )}
       </div>
       {message && (
         <p
