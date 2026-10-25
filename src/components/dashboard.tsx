@@ -1,5 +1,7 @@
 "use client";
 import Link from "next/link";
+import { AttendanceCard } from "./attendance-card";
+import type { AttendanceCardData } from "@/lib/attendance";
 import { useEffect, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import {
@@ -17,6 +19,8 @@ import {
   FileText,
   AlertCircle,
   BellRing,
+  Radio,
+  Camera,
 } from "lucide-react";
 import { type Profile, type BusinessRecord, moduleMap } from "@/lib/modules";
 import { money } from "@/lib/domain";
@@ -68,6 +72,8 @@ export type Stats = {
   chart: { label: string; amount: number }[];
 };
 export function Dashboard({
+  attendance = null,
+  field = null,
   profile,
   stats: initialStats,
   recent,
@@ -77,6 +83,10 @@ export function Dashboard({
   creatable = [],
   reminders = [],
 }: {
+  /** Today's check-in card; null when the person may not record attendance. */
+  /** Field tracking status for field employees. */
+  field?: { active: boolean; startedAt: string | null; photos: boolean } | null;
+  attendance?: (AttendanceCardData & { canCheckIn: boolean; canCheckOut: boolean; canRequestCorrection: boolean }) | null;
   profile: Profile;
   stats: Stats;
   recent: BusinessRecord[];
@@ -272,7 +282,7 @@ export function Dashboard({
   ].filter((item) => visible.includes(item.module) && item.count > 0);
   const nextAction = attention[0];
   const quickActions = [
-    ...(visible.includes("attendance")
+    ...(visible.includes("attendance") && !attendance
       ? [
           {
             href: "/modules/attendance",
@@ -339,6 +349,39 @@ export function Dashboard({
           )}
         </div>
       </div>
+      {attendance && <AttendanceCard {...attendance} />}
+      {field && (
+        <section
+          aria-label="Field work"
+          className={`panel mb-6 flex flex-wrap items-center justify-between gap-3 p-4 ${field.active ? "border-success/40" : ""}`}
+        >
+          <div className="flex items-center gap-3">
+            <span className={`grid h-9 w-9 place-items-center rounded-full ${field.active ? "bg-success/15 text-success" : "bg-muted text-muted-foreground"}`}>
+              <Radio size={16} className={field.active ? "animate-pulse" : ""} />
+            </span>
+            <div>
+              <p className="text-sm font-semibold">{field.active ? "Field tracking is ON" : "Field tracking is off"}</p>
+              <p className="text-xs text-muted-foreground">
+                {field.active && field.startedAt
+                  ? `Session running since ${new Date(field.startedAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}. Keep the Field operations page open to record locations.`
+                  : "Start a field session when you head out. Location is recorded only during a session."}
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button asChild variant={field.active ? "outline" : "default"} size="sm">
+              <Link href="/field">{field.active ? "Open field work" : "Start field session"}</Link>
+            </Button>
+            {field.active && field.photos && (
+              <Button asChild size="sm">
+                <Link href="/field#gps-camera">
+                  <Camera size={14} /> GPS photo
+                </Link>
+              </Button>
+            )}
+          </div>
+        </section>
+      )}
       <section
         aria-label="Quick actions"
         className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4"

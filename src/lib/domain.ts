@@ -91,3 +91,14 @@ export function money(v: unknown) {
     maximumFractionDigits: 0,
   }).format(Number(v) || 0);
 }
+/** A username starts with a letter; anything else is treated as a phone number. */
+export function loginIdentity(raw: string): { phone: string } | { username: string } {
+  const value = raw.trim();
+  if (/^[a-z]/i.test(value)) {
+    const username = value.toLowerCase();
+    if (!/^[a-z][a-z0-9._-]{2,39}$/.test(username))
+      throw Error("Incorrect username, phone number or password.");
+    return { username };
+  }
+  return { phone: normalizePhone(value) };
+}

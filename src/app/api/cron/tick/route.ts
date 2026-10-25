@@ -23,6 +23,11 @@ export async function GET(req: NextRequest) {
     const count = await db.rpc<number>("scheduler_tick");
     // Reminder occurrences are scheduled in the database, so alerts fire even when no browser is open.
     const reminders = await db.rpc<number>("reminders_tick");
+    // Clears exact attendance coordinates older than the configured retention period.
+    const locationsPurged = await db.rpc<number>("purge_attendance_locations");
+    // Field sessions past their scheduled window stop accepting points; old field locations expire.
+    const fieldClosed = await db.rpc<number>("field_close_expired");
+    const fieldPurged = await db.rpc<number>("field_purge");
     const email = await processEmailQueue(20);
     let sent = 0;
     let failed = 0;
@@ -122,6 +127,9 @@ export async function GET(req: NextRequest) {
       ok: true,
       notifications: count,
       reminders,
+      locations_purged: locationsPurged,
+      field_sessions_closed: fieldClosed,
+      field_points_purged: fieldPurged,
       email,
       push_sent: sent,
       push_failed: failed,

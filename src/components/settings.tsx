@@ -47,6 +47,8 @@ export type CompanySettings = {
     eod_reminder?: string;
   }[];
   renewal_days: number;
+  /** Days before exact attendance coordinates are cleared. */
+  location_retention_days?: number;
   reminder_intervals: number[];
   reminder_yearly_advance_months: number;
   reminder_monthly_advance_days: number;
@@ -109,10 +111,12 @@ export function Settings({
   initialTab = "notifications",
   allowedTabs,
   canManageAccess = false,
+  canViewLocations = false,
 }: {
   /** Tabs this person may open; each is enforced again when saving. */
   allowedTabs?: SettingsTab[];
   canManageAccess?: boolean;
+  canViewLocations?: boolean;
   profile: Profile;
   settings: CompanySettings;
   preferences: Preferences;
@@ -219,6 +223,14 @@ export function Settings({
             className="border-b-2 border-transparent px-3 pb-3 text-xs text-muted-foreground hover:text-foreground"
           >
             Roles & permissions
+          </Link>
+        )}
+        {canViewLocations && (
+          <Link
+            href="/settings/locations"
+            className="border-b-2 border-transparent px-3 pb-3 text-xs text-muted-foreground hover:text-foreground"
+          >
+            Office locations
           </Link>
         )}
       </div>
@@ -477,9 +489,6 @@ export function Settings({
               ["eod_deadline", "Final daily report deadline"],
               ["grace_minutes", "Attendance grace minutes"],
               ["half_day_hours", "Minimum hours for a full day"],
-              ["office_lat", "Office latitude"],
-              ["office_lng", "Office longitude"],
-              ["geofence_radius", "Geofence radius (metres)"],
               [
                 "renewal_days",
                 "Daily renewal alerts start (days before expiry)",
@@ -495,9 +504,6 @@ export function Settings({
               const numeric = [
                 "grace_minutes",
                 "half_day_hours",
-                "office_lat",
-                "office_lng",
-                "geofence_radius",
                 "renewal_days",
               ].includes(key);
               return (
@@ -550,18 +556,18 @@ export function Settings({
                 )}
               </div>
             </div>
-            <div className="md:col-span-2">
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={s.enforce_geofence}
-                  onChange={(e) =>
-                    setS({ ...s, enforce_geofence: e.target.checked })
-                  }
-                />
-                Require office geofence for office clock-ins
-              </label>
-            </div>
+            <p className="text-xs text-muted-foreground md:col-span-2">
+              Office coordinates, geofence radius and who checks in where are
+              managed in{" "}
+              {canViewLocations ? (
+                <Link href="/settings/locations" className="text-primary hover:underline">
+                  Office locations
+                </Link>
+              ) : (
+                "Office locations (Super Admin)"
+              )}
+              .
+            </p>
             <div>
               <label>Holidays (one date per line)</label>
               <textarea

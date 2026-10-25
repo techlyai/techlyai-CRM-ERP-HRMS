@@ -13,13 +13,19 @@ export async function uploadFile(
   sound = false,
   conversation?: string,
   options: {
-    kind?: "general" | "joining";
+    kind?: "general" | "joining" | "field_photo" | "field_report";
+    /** Field photo or report id for the field_* kinds. */
+    fieldTarget?: string;
     onProgress?: (sent: number, total: number) => void;
     signal?: AbortSignal;
   } = {},
 ) {
   const info = {
-    ...(conversation ? { conversation } : { record, sound }),
+    ...(options.fieldTarget
+      ? { fieldTarget: options.fieldTarget }
+      : conversation
+        ? { conversation }
+        : { record, sound }),
     ...(options.kind && options.kind !== "general" ? { kind: options.kind } : {}),
     name: file.name,
     mime:

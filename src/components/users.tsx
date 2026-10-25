@@ -4,12 +4,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { KeyRound, Plus, Search, ShieldCheck } from "lucide-react";
 import { type Profile } from "@/lib/modules";
-import { createUser, updateProfile } from "@/lib/actions";
+import { createUser, resetUserPassword, updateProfile } from "@/lib/actions";
 import { roleLabel } from "@/lib/roles";
 import { Button } from "./ui/button";
 import { Dialog, DialogContent } from "./ui/dialog";
 
-type Person = Profile & { email?: string | null; employee_id?: string | null; phone?: string };
+type Person = Profile & { email?: string | null; employee_id?: string | null; phone?: string; username?: string | null };
 
 export function Users({
   people,
@@ -28,6 +28,7 @@ export function Users({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [created, setCreated] = useState<{ id: string; name: string; password: string } | null>(null);
+  const [reset, setReset] = useState<{ name: string; password: string } | null>(null);
   const [query, setQuery] = useState("");
   const [role, setRole] = useState("");
   const q = query.trim().toLowerCase();
@@ -36,6 +37,7 @@ export function Users({
       (!q ||
         p.full_name.toLowerCase().includes(q) ||
         (p.employee_id || "").toLowerCase().includes(q) ||
+        (p.username || "").includes(q) ||
         (p.phone || "").includes(q)) &&
       (!role || p.role === role),
   );
@@ -86,11 +88,19 @@ export function Users({
           )}
         </div>
       )}
+      {reset && !open && (
+        <div role="status" className="mb-5 rounded-xl border border-success/30 bg-success/5 p-4 text-sm">
+          <p className="font-semibold">{reset.name}'s password was reset and their sessions were signed out.</p>
+          <p className="mt-2 text-xs">
+            Temporary password: <code className="rounded bg-muted px-1.5 py-0.5 font-bold">{reset.password}</code>. Share it securely; it is shown only once and must be changed at next sign-in.
+          </p>
+        </div>
+      )}
       <div className="panel mb-4 flex flex-col gap-3 p-3 sm:flex-row">
         <label className="relative flex-1">
           <span className="sr-only">Search users</span>
           <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search name, employee ID or phone" className="h-10 pl-9" />
+          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search name, username, employee ID or phone" className="h-10 pl-9" />
         </label>
         <select aria-label="Filter by role" value={role} onChange={(e) => setRole(e.target.value)} className="h-10 sm:w-44">
           <option value="">All roles</option>
@@ -113,7 +123,9 @@ export function Users({
               <tr key={p.id} className="border-t">
                 <td className="p-4">
                   <span className="block font-medium">{p.full_name}</span>
-                  {p.employee_id && <span className="text-[11px] text-muted-foreground">{p.employee_id}</span>}
+                  <span className="text-[11px] text-muted-foreground">
+                    {[p.username && "@" + p.username, p.employee_id].filter(Boolean).join(" · ")}
+                  </span>
                 </td>
                 <td className="p-4">{p.phone}</td>
                 <td className="p-4">
@@ -127,7 +139,7 @@ export function Users({
                 <td className="p-4">
                   <div className="flex justify-end gap-2">
                     {abilities.edit && (superAdmin || p.role !== "super_admin") && (
-                      <Button size="sm" variant="outline" onClick={() => { setEdit(p); setError(""); setOpen(true); }}>
+                      <Button size="sm" variant="outline" onClick={() => { setEdit(p); setError(""); setReset(null); setOpen(true); }}>
                         Manage
                       </Button>
                     )}
@@ -172,6 +184,7 @@ export function Users({
                 manager: String(f.get("manager") || ""),
                 role: String(f.get("role") || edit?.role || "employee"),
                 email: String(f.get("email") || ""),
+                username: String(f.get("username") || ""),
               };
               const r = edit
                 ? await updateProfile({ ...input, id: edit.id, active: f.get("active") === "on" })
@@ -194,6 +207,19 @@ export function Users({
                   <input id="u-phone" name="phone" type="tel" required placeholder="+91 98765 43210" />
                 </div>
               )}
+              <div>
+                <label htmlFor="u-username">Username</label>
+                <input
+                  id="u-username"
+                  name="username"
+                  defaultValue={edit?.username || ""}
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  pattern="[a-z][a-z0-9._-]{2,39}"
+                  title="3–40 lowercase letters, numbers, dots, dashes or underscores, starting with a letter"
+                  placeholder="Optional, e.g. priya.s"
+                />
+              </div>
               <div>
                 <label htmlFor="u-email">Email</label>
                 <input id="u-email" name="email" type="email" defaultValue={edit?.email || ""} placeholder="name@company.com" />
@@ -234,6 +260,29 @@ export function Users({
                 <input name="active" type="checkbox" defaultChecked={edit.active} disabled={edit.id === me.id && !superAdmin} />
                 Account active
               </label>
+            )}
+            {edit && edit.id !== me.id && (superAdmin || edit.role !== "super_admin") && (
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border p-3">
+                <p className="text-xs text-muted-foreground">Issue a new temporary password and sign this person out everywhere.</p>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={busy}
+                  onClick={async () => {
+                    if (!confirm(`Reset the password for ${edit.full_name}? Their current password stops working immediately.`)) return;
+                    setBusy(true);
+                    setError("");
+                    const r = await resetUserPassword(edit.id);
+                    setBusy(false);
+                    if (!r.ok || !r.message) return setError(r.error || "Password reset failed");
+                    setReset({ name: edit.full_name, password: r.message });
+                    setOpen(false);
+                  }}
+                >
+                  <KeyRound size={13} /> Reset password
+                </Button>
+              </div>
             )}
             {error && (
               <p role="alert" className="error">{error}</p>
