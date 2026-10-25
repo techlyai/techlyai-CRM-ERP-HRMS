@@ -32,6 +32,7 @@ import { RecordForm, RichText, type Reference } from "./record-form";
 import { Attachments, type Attachment } from "./attachments";
 import { Dialog, DialogContent } from "./ui/dialog";
 import { DocumentReview } from "./document-review";
+import { JoiningDocuments } from "./joining-documents";
 export type Question = {
   id: string;
   body: string;
@@ -113,6 +114,11 @@ export function RecordDetails({
       : "details",
   );
   const m = moduleMap[r.module];
+  // Joining PDFs have their own section; newest first.
+  const joiningFiles = files
+    .filter((f) => f.kind === "joining")
+    .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+  const generalFiles = files.filter((f) => f.kind !== "joining");
   function open(action: string, parentId?: string) {
     if (actionInFlight.current || refreshing) return;
     setDialog(action);
@@ -331,13 +337,28 @@ export function RecordDetails({
         className={`grid gap-6 xl:grid-cols-[1.7fr_1fr] ${tab === "credentials" ? "hidden" : ""}`}
       >
         <div className="space-y-5">
+          {tab === "details" && r.module === "employees" && (
+            <JoiningDocuments
+              record={r.id}
+              included={r.data.joining_documents}
+              files={joiningFiles}
+              people={people}
+              canUpload={canUpload}
+            />
+          )}
           {tab === "details" && (
             <section className="panel p-5">
               <h2 className="section-title mb-5">Record details</h2>
               <dl className="grid gap-6 md:grid-cols-2">
                 {Object.entries(r.data)
                   .filter(
-                    ([k]) => !["renewal_history", "team", "lines"].includes(k),
+                    ([k]) =>
+                      ![
+                        "renewal_history",
+                        "team",
+                        "lines",
+                        "joining_documents",
+                      ].includes(k),
                   )
                   .map(([k, v]) => {
                     const f = m.fields.find((f) => f.key === k);
@@ -578,7 +599,11 @@ export function RecordDetails({
           )}
         </div>
         <div className="space-y-5">
-          <Attachments record={r.id} files={files} canUpload={canUpload} />
+          <Attachments
+            record={r.id}
+            files={generalFiles}
+            canUpload={canUpload}
+          />
           <DocumentReview
             files={files}
             canApprove={canApprove}

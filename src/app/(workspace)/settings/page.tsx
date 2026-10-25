@@ -1,4 +1,4 @@
-import { context } from "@/lib/database";
+import { context, grants, can } from "@/lib/database";
 import {
   Settings,
   type CompanySettings,
@@ -26,7 +26,21 @@ export default async function SettingsPage({
   searchParams: { tab?: string };
 }) {
   const { db, profile } = await context();
-  const admin = profile.role === "super_admin";
+  const permissions = await grants(db);
+  const has = (action: string) => can(profile, permissions, "settings", action);
+  // Each settings area follows its own permission; the database enforces saves.
+  const allowedTabs: SettingsTab[] = [
+    "notifications",
+    "sounds",
+    ...(has("reminders") ? (["reminders"] as SettingsTab[]) : []),
+    ...(has("company") ? (["company"] as SettingsTab[]) : []),
+    ...(has("chat") ? (["chat"] as SettingsTab[]) : []),
+    ...(has("email") ? (["email"] as SettingsTab[]) : []),
+    ...(has("employee_ids") ? (["employee IDs"] as SettingsTab[]) : []),
+    ...(has("leave_policy") ? (["leave policy"] as SettingsTab[]) : []),
+    ...(profile.role === "super_admin" ? (["scheduler"] as SettingsTab[]) : []),
+  ];
+  const canManageAccess = can(profile, permissions, "users", "permissions");
   const [settings, prefs, runs, policies, emailSettings, emailLog, idSettings] =
     await Promise.all([
       db.select<{ data: CompanySettings }>("settings", "select=data&id=eq.1"),
@@ -49,26 +63,26 @@ export default async function SettingsPage({
         eligibility_days: number;
         paid: boolean;
       }>("leave_policies"),
-      admin
+      has("email")
         ? db.select<{ data: EmailSettings }>(
             "email_settings",
             "select=data&id=eq.1",
           )
         : Promise.resolve([]),
-      admin
+      has("email")
         ? db.select<EmailLogRow>(
             "email_log",
             "select=id,event,recipient,subject,status,provider,provider_id,error,attempts,sent_at,created_at,next_attempt_at&order=created_at.desc&limit=100",
           )
         : Promise.resolve([]),
-      admin
+      has("employee_ids")
         ? db.select<{ data: EmployeeIdSettings }>(
             "employee_id_settings",
             "select=data&id=eq.1",
           )
         : Promise.resolve([]),
     ]);
-  const employeeIdPreview = admin
+  const employeeIdPreview = has("employee_ids")
     ? await db
         .rpc<string>("employee_id_preview", { p_department: null })
         .catch(() => "")
@@ -87,9 +101,10 @@ export default async function SettingsPage({
       emailLog={emailLog}
       employeeIdSettings={idSettings[0]?.data || null}
       employeeIdPreview={employeeIdPreview}
+      allowedTabs={allowedTabs}
+      canManageAccess={canManageAccess}
       initialTab={
-        tabs.includes(requested) &&
-        (admin || requested === "notifications" || requested === "sounds")
+        tabs.includes(requested) && allowedTabs.includes(requested)
           ? requested
           : "notifications"
       }

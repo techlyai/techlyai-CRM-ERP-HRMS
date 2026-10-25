@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { normalizePhone } from "./domain";
+import { joiningDocuments, normalizeJoiningDocuments } from "./joining";
 
 export type Field = {
   key: string;
@@ -261,7 +262,12 @@ export const modules: Module[] = [
       date("probation_end", "Probation end"),
       date("notice_end", "Notice period end"),
       notes("appraisal", "Appraisal / transfer history"),
-      notes("checklist", "Joining formalities"),
+      {
+        key: "joining_documents",
+        label: "Documents included in the joining PDF",
+        type: "json",
+      },
+      notes("checklist", "Joining notes"),
       notes(),
     ],
   },
@@ -751,6 +757,15 @@ export function validateRecord(module: string, input: unknown) {
         "Employee ID may use letters, numbers, / _ . or - (up to 40 characters)",
       );
     else data.employee_id = employeeId;
+    // Only the known joining documents, in canonical order.
+    if (data.joining_documents !== undefined) {
+      const list = Array.isArray(data.joining_documents)
+        ? data.joining_documents.map(String)
+        : [];
+      if (list.some((d) => !(joiningDocuments as readonly string[]).includes(d)))
+        throw Error("Choose documents from the joining checklist");
+      data.joining_documents = normalizeJoiningDocuments(list);
+    }
   }
   if (module === "eod" && !String(data.completed ?? "").trim())
     throw Error("Tasks completed is required");

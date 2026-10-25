@@ -20,3 +20,16 @@ Client logins are stored on the client record's Credentials tab. Passwords are e
 - **History.** Every password change closes the previous version and stores the new one in a single transaction. Versions keep who set and replaced them, when, and why.
 - **Audit.** Creation, edits, password changes, reveals, copies, history views, archive, restore and deletion are recorded in `public.credential_audit` without any secret values. Reveals and copies are limited to 30 per user per minute.
 - **Exposure.** Credentials are excluded from exports, global search and notifications. Passwords are fetched only when a user clicks Show or Copy, and revealed values are masked again after 30 seconds.
+
+## Roles and permissions (migration 006)
+
+Three access levels: **Super Admin** (`super_admin`, always full access), **Admin** (`manager`) and **Employee** (`employee`). Admins and Employees have only what their role defaults and individual overrides grant.
+
+- **Catalogue.** Every grantable permission is a row in `public.permission_definitions` (module + action), referenced by `permission_grants` through a foreign key. The Settings → Roles & permissions checklist is generated from this table, and each item maps to a database check: business-record actions via `private.permitted`, plus Users, Settings, Audit, Chat and Client credentials permissions via `private.has_feature`/`private.credential_allowed`.
+- **Scopes.** Record permissions reach Own records, Reporting team, Department or All records. Employees never reach other people's private HR records (employees, payroll, attendance, leave, corrections, onboarding), whatever they are granted.
+- **Resolution.** `private.scope_for` returns the individual override if one exists, otherwise the role default, otherwise no access. Changes are read on every request, so revocations apply immediately.
+- **Delegation.** Super Admins can change anything. Others need *Manage employee permissions* for the target person, can only grant or remove permissions within their own reach (`private.scope_covers`), cannot edit themselves or a Super Admin, and cannot change roles. Only Super Admins create Admins or Super Admins; Admins with *Create employee accounts* create Employees placed under them (team) or in their department.
+- **Role defaults.** Super Admin only. A change applies either to everyone who inherits the default or to new people only, in which case existing people keep their current access as recorded overrides.
+- **History.** `public.permission_audit` records every grant, revocation, reset, copy, template application and role-default change with before and after values, the actor, time and reason. No secrets are logged.
+
+`scripts/verify-rbac.ts` exercises these rules against a database (`DATABASE_ADMIN_URL=… node scripts/run-ts.cjs scripts/verify-rbac.ts`).

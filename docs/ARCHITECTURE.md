@@ -53,3 +53,9 @@ Numbered migrations in `database/migrations/` are applied by `npm run db:setup` 
 | `public.notifications` (+ `priority`, `link`, `meta`) | Notification centre entries with deep links and structured context such as employee and project names |
 
 `public.reminders_tick()` and `public.scheduler_tick()` run every minute from the scheduler container through the cron endpoint, so reminder alerts, daily repeats, escalations and email retries do not depend on an open browser. Duplicate alerts are prevented by `unique(user_id,event_key)`; chat uses one upserted notification per conversation. Email rows are marked `accepted` only when the provider returns an identifier; a missing `RESEND_API_KEY` or sender address records a `failed` attempt that is retried with backoff up to the configured limit.
+
+## Joining documents and large files (migration 005)
+
+Employee records have a **Joining documents** section: one combined PDF (joining letter, Aadhaar, PAN, bank passbook, 10th and 12th certificates, course completion and experience certificates, resume, passport photo) plus a checklist stored in `data.joining_documents`. Each upload is kept as a new version (`public.attachments.kind = 'joining'`); the newest is current and earlier ones stay downloadable.
+
+Files above 20 MB, and every joining PDF, use chunked storage: uploaded 3 MiB pieces are copied inside PostgreSQL into `private.stored_file_chunks` when the upload finishes, and downloads stream one piece at a time with HTTP range support, so file size is not bounded by server memory. Smaller attachments keep the single-value layout. Joining PDFs have no application size limit unless `MAX_JOINING_DOCUMENT_MB` is set; plan disk space and backup size accordingly. Uploads are checked for a PDF header and a closing `%%EOF` marker, and stay alive while pieces keep arriving.

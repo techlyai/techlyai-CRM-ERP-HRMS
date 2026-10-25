@@ -6,7 +6,7 @@ import {
   type ChatPolicy,
   type DirectoryPerson,
 } from "@/components/chat/helpers";
-import { context, serviceDB } from "@/lib/database";
+import { context, serviceDB, grants, can } from "@/lib/database";
 
 export const metadata = { title: "Team chat" };
 export const dynamic = "force-dynamic";
@@ -17,6 +17,12 @@ export default async function ChatPage({
   searchParams: { c?: string };
 }) {
   const { db, profile } = await context();
+  if (!can(profile, await grants(db), "chat", "view"))
+    return (
+      <p className="error">
+        You do not have access to chat. Ask an administrator if you need it.
+      </p>
+    );
   const [settings, people, projects] = await Promise.all([
     db.select<{ data: { chat?: Partial<ChatPolicy> } }>(
       "settings",

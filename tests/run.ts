@@ -8,3 +8,5 @@ import "./record-workflows.test";
 import "./invites.test";
 import "./chat-presence.test";
 import "./notifications.test";
+import "./joining.test";
+import "./rbac.test";
