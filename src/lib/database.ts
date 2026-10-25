@@ -160,6 +160,19 @@ export function allowed(
       (grant.scope !== "self" || owner === profile.id),
   );
 }
+/** Widest scope the signed-in user holds for a permission (UI hint; the database enforces). */
+export function scopeOf(
+  profile: Profile,
+  permissions: Awaited<ReturnType<typeof grants>>,
+  module: string,
+  action: string,
+) {
+  if (profile.role === "super_admin") return "all";
+  const grant =
+    permissions.find((g) => g.user_id === profile.id && g.module === module && g.action === action) ||
+    permissions.find((g) => !g.user_id && g.role === profile.role && g.module === module && g.action === action);
+  return grant?.scope || "none";
+}
 /** Throws unless the database grants the signed-in user this permission for `owner`. */
 export async function requirePermission(
   db: Database,

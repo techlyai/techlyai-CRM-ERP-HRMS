@@ -8,7 +8,7 @@ import {
   Send,
   MessageSquare,
   RefreshCw,
-  MapPin,
+  
   CalendarClock,
   MoreHorizontal,
   Trash2,
@@ -436,19 +436,6 @@ export function RecordDetails({
                   </p>
                 </div>
               )}
-              {r.module === "attendance" &&
-                r.data.lat !== null &&
-                r.data.lat !== undefined && (
-                  <a
-                    className="mt-5 inline-flex items-center gap-2 text-xs text-primary"
-                    target="_blank"
-                    rel="noreferrer"
-                    href={`https://www.openstreetmap.org/?mlat=${Number(r.data.lat)}&mlon=${Number(r.data.lng)}#map=17/${Number(r.data.lat)}/${Number(r.data.lng)}`}
-                  >
-                    <MapPin size={14} />
-                    View check-in location on map
-                  </a>
-                )}
             </section>
           )}
           {tab === "conversation" && (
@@ -646,8 +633,8 @@ export function RecordDetails({
           )}
           {r.data.flagged === true && (
             <p className="error mt-5">
-              This check-in was flagged for review because the reported location
-              or accuracy falls outside office policy.
+              This check-in was not location-verified: the reported position or
+              its accuracy fell outside the assigned office geofence.
             </p>
           )}
         </div>

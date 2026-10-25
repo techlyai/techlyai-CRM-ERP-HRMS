@@ -1,5 +1,8 @@
 const tables = new Set([
   "profiles",
+  "office_locations",
+  "attendance_assignments",
+  "location_audit",
   "permission_grants",
   "records",
   "record_shares",

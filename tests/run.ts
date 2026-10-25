@@ -10,3 +10,6 @@ import "./chat-presence.test";
 import "./notifications.test";
 import "./joining.test";
 import "./rbac.test";
+import "./dev-accounts.test";
+import "./attendance-geo.test";
+import "./field.test";

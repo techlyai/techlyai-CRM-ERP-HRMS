@@ -46,6 +46,7 @@ const EMAIL_EVENTS = [
   "payments",
   "tasks",
   "chat",
+  "field",
 ] as const;
 const emailAddress = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const emailSettingsSchema = z

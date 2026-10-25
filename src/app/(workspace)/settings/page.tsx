@@ -41,6 +41,7 @@ export default async function SettingsPage({
     ...(profile.role === "super_admin" ? (["scheduler"] as SettingsTab[]) : []),
   ];
   const canManageAccess = can(profile, permissions, "users", "permissions");
+  const canViewLocations = ["view", "manage", "assign"].some((a) => can(profile, permissions, "locations", a));
   const [settings, prefs, runs, policies, emailSettings, emailLog, idSettings] =
     await Promise.all([
       db.select<{ data: CompanySettings }>("settings", "select=data&id=eq.1"),
@@ -103,6 +104,7 @@ export default async function SettingsPage({
       employeeIdPreview={employeeIdPreview}
       allowedTabs={allowedTabs}
       canManageAccess={canManageAccess}
+      canViewLocations={canViewLocations}
       initialTab={
         tabs.includes(requested) && allowedTabs.includes(requested)
           ? requested
