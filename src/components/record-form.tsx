@@ -1,9 +1,10 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Plus, X, Bold, Italic, List } from "lucide-react";
 import { moduleMap, type Profile, type BusinessRecord } from "@/lib/modules";
 import { localDate } from "@/lib/domain";
+import { toDateTimeLocal } from "@/lib/reminders";
 import { saveRecord } from "@/lib/actions";
 import { Button } from "./ui/button";
 import { Dialog, DialogContent } from "./ui/dialog";
@@ -28,6 +29,8 @@ export function RecordForm({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [duplicates, setDuplicates] = useState(0);
+  const submitting = useRef(false);
+  const duplicateRequest = useRef(0);
   const [lines, setLines] = useState<
     { item_id: string; quantity: number; unit_cost: number }[]
   >(
@@ -38,6 +41,39 @@ export function RecordForm({
     }[]) || [{ item_id: "", quantity: 1, unit_cost: 0 }],
   );
   const m = moduleMap[module];
+  useEffect(() => {
+    if (defaultOpen) setOpen(true);
+  }, [defaultOpen]);
+  function changeOpen(next: boolean) {
+    if (submitting.current) return;
+    if (next) {
+      setError("");
+      setDuplicates(0);
+      duplicateRequest.current += 1;
+      setLines(
+        (record?.data.lines as typeof lines) || [
+          { item_id: "", quantity: 1, unit_cost: 0 },
+        ],
+      );
+    }
+    setOpen(next);
+  }
+  async function checkDuplicates(phone: string) {
+    const request = ++duplicateRequest.current;
+    setDuplicates(0);
+    if (!phone.trim()) return;
+    try {
+      const response = await fetch(
+        "/api/leads/duplicates?phone=" + encodeURIComponent(phone),
+      );
+      if (!response.ok) return;
+      const data = (await response.json()) as { ids?: string[] };
+      if (request === duplicateRequest.current)
+        setDuplicates(data.ids?.filter((id) => id !== record?.id).length || 0);
+    } catch {
+      // Duplicate detection is advisory; the form remains usable offline.
+    }
+  }
   function refModule(key: string) {
     if (key === "project_id") return "projects";
     if (key === "purchase_id") return "purchases";
@@ -48,13 +84,13 @@ export function RecordForm({
   return (
     <>
       <Button
-        onClick={() => setOpen(true)}
+        onClick={() => changeOpen(true)}
         variant={record ? "outline" : "default"}
       >
         <Plus size={15} />
         {record ? "Edit record" : `New ${m.singular.toLowerCase()}`}
       </Button>
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog open={open} onOpenChange={changeOpen}>
         <DialogContent
           title={
             record
@@ -66,6 +102,8 @@ export function RecordForm({
             className="mt-6"
             onSubmit={async (e) => {
               e.preventDefault();
+              if (submitting.current) return;
+              submitting.current = true;
               setBusy(true);
               setError("");
               const f = new FormData(e.currentTarget);
@@ -106,10 +144,14 @@ export function RecordForm({
               } catch (e) {
                 setError(e instanceof Error ? e.message : "Invalid form");
               }
+              submitting.current = false;
               setBusy(false);
             }}
           >
-            <div className="grid gap-5 md:grid-cols-2">
+            <fieldset
+              disabled={busy}
+              className="grid min-w-0 gap-5 md:grid-cols-2"
+            >
               <div className="md:col-span-2">
                 <label htmlFor="title">{m.singular} name / title *</label>
                 <input
@@ -133,6 +175,12 @@ export function RecordForm({
                     id="owner_id"
                     defaultValue={record?.owner_id || people[0]?.id}
                   >
+                    {record?.owner_id &&
+                      !people.some((p) => p.id === record.owner_id) && (
+                        <option value={record.owner_id}>
+                          Current responsible employee
+                        </option>
+                      )}
                     {people.map((p) => (
                       <option key={p.id} value={p.id}>
                         {p.full_name}
@@ -324,26 +372,6 @@ export function RecordForm({
                         name={field.key}
                         id={field.key}
                         required={field.required}
-                        onBlur={
-                          module === "leads" && field.key === "phone"
-                            ? async (e) => {
-                                try {
-                                  const res = await fetch(
-                                    "/api/leads/duplicates?phone=" +
-                                      encodeURIComponent(e.currentTarget.value),
-                                  );
-                                  const data = await res.json();
-                                  setDuplicates(
-                                    data.ids?.filter(
-                                      (id: string) => id !== record?.id,
-                                    ).length || 0,
-                                  );
-                                } catch {
-                                  setDuplicates(0);
-                                }
-                              }
-                            : undefined
-                        }
                         defaultValue={String(value || "")}
                       >
                         <option value="">Select an option</option>
@@ -361,6 +389,17 @@ export function RecordForm({
                         <option value="">
                           Select {ref ? "a record" : "a person"}
                         </option>
+                        {value &&
+                        !(
+                          ref
+                            ? references.filter((r) => r.module === ref)
+                            : people
+                        ).some((option) => option.id === value) ? (
+                          <option value={String(value)}>
+                            Current {ref ? "linked record" : "person"}{" "}
+                            (unavailable)
+                          </option>
+                        ) : null}
                         {ref
                           ? references
                               .filter((r) => r.module === ref)
@@ -395,14 +434,23 @@ export function RecordForm({
                         min={field.min}
                         step={field.type === "number" ? "0.01" : undefined}
                         required={field.required}
+                        onBlur={
+                          module === "leads" && field.key === "phone"
+                            ? (event) =>
+                                checkDuplicates(event.currentTarget.value)
+                            : undefined
+                        }
+                        onChange={
+                          module === "leads" && field.key === "phone"
+                            ? () => {
+                                duplicateRequest.current += 1;
+                                setDuplicates(0);
+                              }
+                            : undefined
+                        }
                         defaultValue={
                           field.type === "datetime" && value
-                            ? new Date(
-                                new Date(String(value)).getTime() -
-                                  new Date().getTimezoneOffset() * 60000,
-                              )
-                                .toISOString()
-                                .slice(0, 16)
+                            ? toDateTimeLocal(String(value))
                             : typeof value === "object"
                               ? JSON.stringify(value)
                               : value !== undefined
@@ -422,7 +470,7 @@ export function RecordForm({
                   </div>
                 );
               })}
-            </div>
+            </fieldset>
             {duplicates > 0 && (
               <p
                 role="status"
@@ -442,7 +490,8 @@ export function RecordForm({
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setOpen(false)}
+                disabled={busy}
+                onClick={() => changeOpen(false)}
               >
                 Cancel
               </Button>

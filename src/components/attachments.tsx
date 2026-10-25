@@ -2,14 +2,18 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Paperclip, Download, Loader2, FileCheck2 } from "lucide-react";
+/**
+ * Chunked private upload. Target one of: a record (attachments), a personal
+ * sound, or a chat conversation. Resolves with the stored path.
+ */
 export async function uploadFile(
   record: string | undefined,
   file: File,
   sound = false,
+  conversation?: string,
 ) {
   const info = {
-    record,
-    sound,
+    ...(conversation ? { conversation } : { record, sound }),
     name: file.name,
     mime: file.type || (file.name.endsWith(".csv") ? "text/csv" : ""),
     size: file.size,

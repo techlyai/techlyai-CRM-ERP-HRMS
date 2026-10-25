@@ -15,6 +15,18 @@ const tables = new Set([
   "notifications",
   "push_subscriptions",
   "scheduler_runs",
+  "reminders",
+  "reminder_occurrences",
+  "conversations",
+  "conversation_members",
+  "messages",
+  "message_reads",
+  "message_reports",
+  "presence",
+  "email_settings",
+  "email_log",
+  "employee_id_settings",
+  "employee_id_sequences",
   "client_credentials",
   "credential_audit",
 ]);
@@ -55,6 +67,8 @@ export function selectQuery(table: string, query = "select=*") {
     const raw = value.slice(split + 1);
     const name = column(field);
     if (operator === "is" && raw === "null") conditions.push(name + " is null");
+    else if (operator === "not" && raw === "null")
+      conditions.push(name + " is not null");
     else if (operator === "in" && raw.startsWith("(") && raw.endsWith(")")) {
       const entries = raw.slice(1, -1).split(",");
       if (entries.length > 100) throw Error("Too many filter values");

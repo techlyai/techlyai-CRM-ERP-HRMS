@@ -56,7 +56,7 @@ export default async function Activity({
         ))}
         {!entries.length && (
           <p className="p-10 text-center text-sm text-muted-foreground">
-            Activity will appear as your team starts using Techly.
+            Activity will appear as your team starts using Orbit.
           </p>
         )}
       </section>

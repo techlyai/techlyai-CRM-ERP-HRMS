@@ -27,11 +27,15 @@ export async function POST(req: NextRequest) {
       .object({
         record: z.string().uuid().optional(),
         sound: z.boolean().optional(),
+        conversation: z.string().uuid().optional(),
         name: z.string().min(1).max(255),
         mime: z.string().max(255),
         size: z.number().int().positive(),
       })
       .strict()
+      .refine((v) => !v.conversation || (!v.record && !v.sound), {
+        message: "Choose a record or a conversation, not both",
+      })
       .parse(await req.json());
     return NextResponse.json(await startUpload(token, info));
   } catch (e) {

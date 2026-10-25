@@ -21,6 +21,7 @@ export function LoginForm({
       className="mt-8 space-y-5"
       onSubmit={async (e) => {
         e.preventDefault();
+        if (busy) return;
         setError("");
         setBusy(true);
         const data = new FormData(e.currentTarget);
@@ -30,14 +31,19 @@ export function LoginForm({
           setBusy(false);
           return;
         }
-        const result = change
-          ? await changePassword(password)
-          : await login({ phone: String(data.get("phone")), password });
-        setBusy(false);
-        if (!result.ok) setError(result.error || "Sign-in failed");
-        else {
-          router.push("/");
-          router.refresh();
+        try {
+          const result = change
+            ? await changePassword(password)
+            : await login({ phone: String(data.get("phone")), password });
+          if (!result.ok) setError(result.error || "Sign-in failed");
+          else {
+            router.push("/");
+            router.refresh();
+          }
+        } catch {
+          setError("We couldn’t connect. Check your connection and try again.");
+        } finally {
+          setBusy(false);
         }
       }}
     >
@@ -115,13 +121,19 @@ export function LoginForm({
         disabled={busy || !configured}
       >
         {busy ? <Loader2 size={16} className="animate-spin" /> : null}
-        {change ? "Set password and continue" : "Sign in"}
+        {busy
+          ? change
+            ? "Saving password…"
+            : "Signing in…"
+          : change
+            ? "Set password and continue"
+            : "Sign in"}
         {!busy && <ArrowRight size={16} />}
       </Button>
       <p className="text-center text-xs text-muted-foreground">
         {change
           ? "Your temporary password must be changed before continuing."
-          : "Need access? Contact your Techly administrator."}
+          : "Need access? Contact your Orbit administrator."}
       </p>
     </form>
   );

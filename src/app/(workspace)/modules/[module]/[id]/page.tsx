@@ -74,6 +74,12 @@ export default async function Detail({
       "select=*&item_id=eq." + r.id + "&order=created_at.desc",
     ),
   ]);
+  if (r.module === "purchases") {
+    const catalog = await db.rpc<Reference[]>("purchase_catalog");
+    for (const item of catalog)
+      if (!references.some((reference) => reference.id === item.id))
+        references.push(item);
+  }
   const related =
     params.module === "projects"
       ? await db.select<BusinessRecord>(
@@ -100,7 +106,9 @@ export default async function Detail({
       const [credentials, projects] = await Promise.all([
         db.select<Credential>(
           "client_credentials",
-          "select=*&client_id=eq." + r.id + "&order=service_name.asc&limit=1000",
+          "select=*&client_id=eq." +
+            r.id +
+            "&order=service_name.asc&limit=1000",
         ),
         db.select<{ id: string; title: string }>(
           "records",

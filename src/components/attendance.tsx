@@ -1,24 +1,39 @@
 "use client";
-import { useState } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Clock3, MapPin, Loader2, Camera } from "lucide-react";
 import { clock } from "@/lib/actions";
 import { type BusinessRecord } from "@/lib/modules";
 import { Button } from "./ui/button";
 import { uploadFile } from "./attachments";
-export function Attendance({ today }: { today?: BusinessRecord }) {
+export function Attendance({
+  today,
+  timezone,
+}: {
+  today?: BusinessRecord;
+  timezone: string;
+}) {
   const router = useRouter();
-  const [busy, setBusy] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [refreshing, startTransition] = useTransition();
+  const busy = saving || refreshing;
+  const lock = useRef(false);
   const [error, setError] = useState("");
   const [consent, setConsent] = useState(false);
   const [wfh, setWfh] = useState(false);
   const [photo, setPhoto] = useState<File>();
   async function run(action: "in" | "out") {
-    setBusy(true);
+    if (lock.current || refreshing) return;
+    lock.current = true;
+    setSaving(true);
     setError("");
     try {
       let position: GeolocationPosition | undefined;
       if (consent && action === "in") {
+        if (!navigator.geolocation)
+          throw Error(
+            "Location is unavailable in this browser. Use a supported browser or uncheck location sharing if office policy allows it.",
+          );
         position = await new Promise((resolve, reject) =>
           navigator.geolocation.getCurrentPosition(resolve, reject, {
             enableHighAccuracy: true,
@@ -44,7 +59,7 @@ export function Attendance({ today }: { today?: BusinessRecord }) {
           );
         }
       }
-      router.refresh();
+      startTransition(() => router.refresh());
     } catch (e) {
       setError(
         e instanceof Error
@@ -52,7 +67,8 @@ export function Attendance({ today }: { today?: BusinessRecord }) {
           : "Location permission was declined. Uncheck GPS consent or enable permission.",
       );
     }
-    setBusy(false);
+    lock.current = false;
+    setSaving(false);
   }
   return (
     <div className="panel mb-6 p-5">
@@ -65,7 +81,7 @@ export function Attendance({ today }: { today?: BusinessRecord }) {
           <p className="mt-2 text-sm text-muted-foreground">
             {today
               ? today.data.clock_in
-                ? `Clocked in at ${new Date(String(today.data.clock_in)).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}${today.data.clock_out ? " · Day completed" : ""}`
+                ? `Clocked in at ${new Date(String(today.data.clock_in)).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", timeZone: timezone })}${today.data.clock_out ? " · Day completed" : ""} (${timezone})`
                 : today.status
               : "Ready to start your working day?"}
           </p>
@@ -100,6 +116,7 @@ export function Attendance({ today }: { today?: BusinessRecord }) {
           <label className="mb-0 flex items-center gap-2 font-normal">
             <input
               type="checkbox"
+              disabled={busy}
               checked={consent}
               onChange={(e) => setConsent(e.target.checked)}
             />
@@ -108,6 +125,7 @@ export function Attendance({ today }: { today?: BusinessRecord }) {
           <label className="mb-0 flex items-center gap-2 font-normal">
             <input
               type="checkbox"
+              disabled={busy}
               checked={wfh}
               onChange={(e) => setWfh(e.target.checked)}
             />
@@ -118,6 +136,7 @@ export function Attendance({ today }: { today?: BusinessRecord }) {
             {photo ? photo.name : "Add attendance photo"}
             <input
               type="file"
+              disabled={busy}
               className="hidden"
               accept="image/jpeg,image/png,image/webp"
               capture="user"

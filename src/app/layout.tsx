@@ -13,10 +13,10 @@ const poppins = Poppins({
   display: "swap",
 });
 export const metadata: Metadata = {
-  title: { default: "Techly", template: "%s · Techly" },
-  applicationName: "Techly",
+  title: { default: "Orbit · A Techly project", template: "%s · Orbit" },
+  applicationName: "Orbit",
   description:
-    "Techly is one connected workspace for your people, customers, and operations.",
+    "Orbit brings your people, customers, and operations into one connected workspace. A Techly project.",
   robots: { index: false, follow: false },
   manifest: "/manifest.webmanifest",
   icons: {
@@ -25,7 +25,7 @@ export const metadata: Metadata = {
   },
   appleWebApp: {
     capable: true,
-    title: "Techly",
+    title: "Orbit",
     statusBarStyle: "black-translucent",
   },
 };

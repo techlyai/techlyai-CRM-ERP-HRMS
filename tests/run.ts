@@ -1,3 +1,10 @@
 import "./domain.test";
 import "./postgres.test";
 import "./vault.test";
+import "./reminders.test";
+import "./sounds.test";
+import "./chat.test";
+import "./record-workflows.test";
+import "./invites.test";
+import "./chat-presence.test";
+import "./notifications.test";

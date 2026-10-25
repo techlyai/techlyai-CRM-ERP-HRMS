@@ -39,3 +39,17 @@ The scheduler is an authenticated Next.js endpoint driven externally every five 
 When changing deployed schemas, add a new reviewed migration; never edit and rerun version 1. `npm run db:contracts` regenerates validation source for a new installation or for deriving a subsequent migration.
 
 Implementation references: [node-postgres transactions](https://node-postgres.com/features/transactions), [PostgreSQL row security](https://www.postgresql.org/docs/current/ddl-rowsecurity.html).
+
+## Reminders, chat, email and employee IDs (migration 002)
+
+Numbered migrations in `database/migrations/` are applied by `npm run db:setup` after version 1; applied versions are recorded with checksums in `private.schema_migrations` and never re-run.
+
+| Table group | Purpose |
+| --- | --- |
+| `public.reminders`, `reminder_occurrences` | Yearly, monthly, weekly, daily, custom and one-time reminders with server-computed `alert_at` (yearly: one month before with month-end clamping; monthly: 14 days before; explicit advance overrides), anchored recurrence, snooze, completion history |
+| `public.conversations`, `conversation_members`, `messages`, `message_reads`, `presence`, `message_reports` | Direct, group, department and project chat with membership-based RLS, read receipts, typing/presence, pins, mutes, reports and audited Admin review |
+| `public.email_settings`, `email_log`, `private.invites` | Sender identity, event toggles, templates, queued deliveries with provider status and retries, secure activation links |
+| `public.employee_id_settings`, `employee_id_sequences` | Configurable ID format and row-locked sequences; `save_record` assigns IDs for new employee records |
+| `public.notifications` (+ `priority`, `link`, `meta`) | Notification centre entries with deep links and structured context such as employee and project names |
+
+`public.reminders_tick()` and `public.scheduler_tick()` run every minute from the scheduler container through the cron endpoint, so reminder alerts, daily repeats, escalations and email retries do not depend on an open browser. Duplicate alerts are prevented by `unique(user_id,event_key)`; chat uses one upserted notification per conversation. Email rows are marked `accepted` only when the provider returns an identifier; a missing `RESEND_API_KEY` or sender address records a `failed` attempt that is retried with backoff up to the configured limit.

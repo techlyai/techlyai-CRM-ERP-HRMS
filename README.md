@@ -1,4 +1,6 @@
-# Techly
+# Orbit
+
+**A Techly project.** Orbit connects your people, customers and operations in one workspace.
 
 **Deploy the complete platform from the `backend` branch only.** Its root
 [`docker-compose.yml`](docker-compose.yml) starts the website, APIs, PostgreSQL,
