@@ -11,16 +11,40 @@ export const fileTypes: Record<string, string[]> = {
   "audio/mpeg": ["mp3"],
   "audio/wav": ["wav"],
 };
+export type FileKind = "general" | "joining";
+/** Files above this size are stored in chunks and streamed, never held whole in memory. */
+export const INLINE_LIMIT = 20 * 1024 * 1024;
+
+/**
+ * Optional ceiling for joining-document PDFs in megabytes. Unset or 0 means no
+ * application limit; disk space and database backups become the practical limit.
+ */
+export function joiningLimitBytes(env = process.env.MAX_JOINING_DOCUMENT_MB) {
+  const mb = Number(env || 0);
+  return Number.isFinite(mb) && mb > 0 ? Math.floor(mb * 1024 * 1024) : null;
+}
+
 export function validateFile(
   name: string,
   mime: string,
   size: number,
   sound = false,
+  kind: FileKind = "general",
 ) {
-  if (
-    !fileTypes[mime] ||
-    !fileTypes[mime].includes(name.toLowerCase().split(".").pop() || "")
-  )
+  const extension = name.toLowerCase().split(".").pop() || "";
+  if (kind === "joining") {
+    if (mime !== "application/pdf" || extension !== "pdf")
+      throw Error("Joining documents must be uploaded as a single PDF file.");
+    if (!Number.isSafeInteger(size) || size <= 0)
+      throw Error("The PDF appears to be empty.");
+    const limit = joiningLimitBytes();
+    if (limit && size > limit)
+      throw Error(
+        `This PDF is larger than the ${Math.round(limit / 1048576)} MB limit set by your administrator.`,
+      );
+    return;
+  }
+  if (!fileTypes[mime] || !fileTypes[mime].includes(extension))
     throw Error("Use JPG, PNG, WebP, PDF, DOCX, XLSX, CSV, MP3, or WAV files.");
   if (sound && !mime.startsWith("audio/"))
     throw Error("Choose an MP3 or WAV sound");
@@ -44,4 +68,8 @@ export function validMagic(bytes: Uint8Array, mime: string) {
     return s.startsWith("RIFF") && s.slice(8, 12) === "WAVE";
   if (mime === "text/csv") return !bytes.includes(0);
   return false;
+}
+/** A complete PDF ends with an %%EOF marker near the end of the file. */
+export function pdfHasEnd(tail: Uint8Array) {
+  return Buffer.from(tail).subarray(-2048).toString("latin1").includes("%%EOF");
 }

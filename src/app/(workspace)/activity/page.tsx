@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { context } from "@/lib/database";
+import { context, grants, can } from "@/lib/database";
 import type { Profile } from "@/lib/modules";
 export default async function Activity({
   searchParams,
@@ -7,9 +7,11 @@ export default async function Activity({
   searchParams: { page?: string };
 }) {
   const { db, profile } = await context();
-  if (profile.role !== "super_admin")
+  if (!can(profile, await grants(db), "audit", "view"))
     return (
-      <p className="error">Activity logs are restricted to Super Admins.</p>
+      <p className="error">
+        You do not have permission to view activity and audit logs.
+      </p>
     );
   const page = Math.max(1, Number(searchParams.page) || 1);
   const [entries, people] = await Promise.all([
@@ -56,7 +58,7 @@ export default async function Activity({
         ))}
         {!entries.length && (
           <p className="p-10 text-center text-sm text-muted-foreground">
-            Activity will appear as your team starts using Techly.
+            Activity will appear as your team starts using Orbit.
           </p>
         )}
       </section>

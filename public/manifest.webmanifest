@@ -1,7 +1,7 @@
 {
-  "name": "Techly Workspace",
-  "short_name": "Techly",
-  "description": "Techly’s connected company workspace",
+  "name": "Orbit · A Techly project",
+  "short_name": "Orbit",
+  "description": "Orbit connects your people, customers and operations. A Techly project.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

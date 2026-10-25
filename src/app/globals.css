@@ -2,7 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Techly design tokens. Every colour in the app derives from these. */
+/* Orbit design tokens. Every colour in the app derives from these. */
 :root {
   --background: 210 40% 98%;
   --foreground: 222 47% 11%;
@@ -187,5 +187,48 @@ button:focus-visible,
   * {
     animation: none !important;
     transition: none !important;
+  }
+}
+
+/* Slim, theme-aware scrollbars for long navigation and panels. */
+@layer utilities {
+  .scroll-thin {
+    scroll-behavior: smooth;
+  }
+  /* Firefox: standard properties. Chromium ignores ::-webkit-scrollbar styling
+     when these are set, so they apply only where WebKit styling is unsupported. */
+  @supports not selector(::-webkit-scrollbar) {
+    .scroll-thin {
+      scrollbar-width: thin;
+      scrollbar-color: hsl(var(--muted-foreground) / 0.25) transparent;
+    }
+  }
+  .scroll-thin::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .scroll-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .scroll-thin::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted-foreground) / 0.22);
+    border-radius: 999px;
+  }
+  .scroll-thin:hover::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted-foreground) / 0.4);
+  }
+  .scroll-thin::-webkit-scrollbar-button {
+    display: none;
+    height: 0;
+  }
+  /* Soft fade where content scrolls under the edges. */
+  .scroll-fade {
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 12px, #000 calc(100% - 20px), transparent 100%);
+    mask-image: linear-gradient(to bottom, transparent 0, #000 12px, #000 calc(100% - 20px), transparent 100%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .scroll-thin {
+    scroll-behavior: auto;
   }
 }

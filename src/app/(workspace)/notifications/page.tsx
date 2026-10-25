@@ -4,22 +4,30 @@ import {
   type Notification,
   type Preferences,
 } from "@/components/notifications";
+export const metadata = { title: "Notifications" };
+export const dynamic = "force-dynamic";
 export default async function Inbox() {
   const { db, profile } = await context();
-  const [items, prefs, records] = await Promise.all([
+  const [items, prefs] = await Promise.all([
     db.select<Notification>(
       "notifications",
-      "select=*&order=created_at.desc&limit=100",
+      "select=*&order=created_at.desc&limit=50",
     ),
     db.select<{ data: Preferences }>(
       "notification_preferences",
       "select=data&user_id=eq." + profile.id,
     ),
-    db.select<{ id: string; module: string }>(
-      "records",
-      "select=id,module&limit=1000",
-    ),
   ]);
+  // Older rows (before deep links were stored) fall back to the record's module page.
+  const legacy = Array.from(
+    new Set(items.filter((n) => !n.link && n.record_id).map((n) => n.record_id!)),
+  ).slice(0, 100);
+  const records = legacy.length
+    ? await db.select<{ id: string; module: string }>(
+        "records",
+        "select=id,module&id=in.(" + legacy.join(",") + ")",
+      )
+    : [];
   return (
     <Notifications
       initial={items}

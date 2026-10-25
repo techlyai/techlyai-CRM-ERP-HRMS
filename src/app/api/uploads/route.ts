@@ -27,11 +27,16 @@ export async function POST(req: NextRequest) {
       .object({
         record: z.string().uuid().optional(),
         sound: z.boolean().optional(),
+        conversation: z.string().uuid().optional(),
+        kind: z.enum(["general", "joining"]).optional(),
         name: z.string().min(1).max(255),
         mime: z.string().max(255),
-        size: z.number().int().positive(),
+        size: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
       })
       .strict()
+      .refine((v) => !v.conversation || (!v.record && !v.sound), {
+        message: "Choose a record or a conversation, not both",
+      })
       .parse(await req.json());
     return NextResponse.json(await startUpload(token, info));
   } catch (e) {
@@ -49,7 +54,7 @@ export async function PUT(req: NextRequest) {
         .number()
         .int()
         .min(0)
-        .max(6)
+        .max(10_000_000)
         .parse(req.nextUrl.searchParams.get("part"));
       const reader = req.body?.getReader();
       if (!reader) throw Error("Missing file chunk");

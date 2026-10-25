@@ -57,7 +57,7 @@ export async function GET(
     return new NextResponse(Buffer.from(file.bytes), {
       headers: {
         "Content-Type": file.mime,
-        "Content-Disposition": `attachment; filename="techly-${m.key}-${new Date().toISOString().slice(0, 10)}.${format}"`,
+        "Content-Disposition": `attachment; filename="orbit-${m.key}-${new Date().toISOString().slice(0, 10)}.${format}"`,
         "Cache-Control": "private, no-store",
       },
     });

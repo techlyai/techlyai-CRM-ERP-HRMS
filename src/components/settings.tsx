@@ -1,5 +1,6 @@
 "use client";
-import { useState } from "react";
+import Link from "next/link";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Bell,
@@ -11,9 +12,19 @@ import {
 import { saveSettings, savePreferences, subscribePush } from "@/lib/actions";
 import type { Profile } from "@/lib/modules";
 import type { Preferences } from "./notifications";
+import type { CompanySounds } from "@/lib/notification-types";
+import type { EmailSettings } from "@/lib/email";
 import { uploadFile } from "./attachments";
 import { Button } from "./ui/button";
 import { playAlertSound } from "@/lib/audio";
+import { SoundSettings } from "./settings-panels/sounds";
+import { ReminderPolicySettings } from "./settings-panels/reminders";
+import { EmailSettingsPanel, type EmailLogRow } from "./settings-panels/email";
+import {
+  EmployeeIdSettingsPanel,
+  type EmployeeIdSettings,
+} from "./settings-panels/employee-ids";
+import { ChatPolicySettings } from "./settings-panels/chat";
 export type CompanySettings = {
   timezone: string;
   working_days: number[];
@@ -37,7 +48,42 @@ export type CompanySettings = {
   }[];
   renewal_days: number;
   reminder_intervals: number[];
+  reminder_yearly_advance_months: number;
+  reminder_monthly_advance_days: number;
+  reminder_repeat_daily: boolean;
+  reminder_default_recurrence:
+    | "none"
+    | "daily"
+    | "weekly"
+    | "monthly"
+    | "yearly"
+    | "custom";
+  reminder_snooze_options: number[];
+  reminder_escalate_days: number;
+  notification_channels: {
+    in_app: boolean;
+    sound: boolean;
+    push: boolean;
+    email: boolean;
+  };
+  sounds: CompanySounds;
+  chat: {
+    group_creation: "admins" | "managers" | "everyone";
+    direct_messages: "everyone" | "team";
+    edit_minutes: number;
+    admin_review: boolean;
+  };
 };
+export type SettingsTab =
+  | "notifications"
+  | "sounds"
+  | "reminders"
+  | "company"
+  | "chat"
+  | "email"
+  | "employee IDs"
+  | "leave policy"
+  | "scheduler";
 const categories = [
   "renewals",
   "attendance",
@@ -56,10 +102,25 @@ export function Settings({
   preferences,
   runs,
   policies,
+  emailSettings,
+  emailLog,
+  employeeIdSettings,
+  employeeIdPreview,
+  initialTab = "notifications",
+  allowedTabs,
+  canManageAccess = false,
 }: {
+  /** Tabs this person may open; each is enforced again when saving. */
+  allowedTabs?: SettingsTab[];
+  canManageAccess?: boolean;
   profile: Profile;
   settings: CompanySettings;
   preferences: Preferences;
+  emailSettings: EmailSettings | null;
+  emailLog: EmailLogRow[];
+  employeeIdSettings: EmployeeIdSettings | null;
+  employeeIdPreview: string;
+  initialTab?: SettingsTab;
   runs: {
     id: number;
     started_at: string;
@@ -81,7 +142,8 @@ export function Settings({
   const [p, setP] = useState(preferences);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
-  const [tab, setTab] = useState("notifications");
+  const [tab, setTab] = useState<SettingsTab>(initialTab);
+  useEffect(() => setTab(initialTab), [initialTab]);
   async function enablePush() {
     setMessage("");
     try {
@@ -117,23 +179,48 @@ export function Settings({
         Make your workspace work for you.
       </p>
       <div className="my-6 flex flex-wrap gap-3 border-b">
-        {[
-          "notifications",
-          ...(profile.role === "super_admin"
-            ? ["company", "leave policy", "scheduler"]
-            : []),
-        ].map((t) => (
+        {(
+          allowedTabs ||
+          ([
+            "notifications",
+            "sounds",
+            ...(profile.role === "super_admin"
+              ? [
+                  "reminders",
+                  "company",
+                  "chat",
+                  "email",
+                  "employee IDs",
+                  "leave policy",
+                  "scheduler",
+                ]
+              : []),
+          ] as SettingsTab[])
+        ).map((t) => (
           <button
             key={t}
             onClick={() => {
               setTab(t);
               setMessage("");
+              router.replace(
+                "/settings?tab=" + encodeURIComponent(t.replaceAll(" ", "-")),
+                { scroll: false },
+              );
             }}
+            aria-current={tab === t ? "page" : undefined}
             className={`border-b-2 px-3 pb-3 text-xs capitalize ${tab === t ? "border-primary text-primary" : "border-transparent text-muted-foreground"}`}
           >
             {t}
           </button>
         ))}
+        {canManageAccess && (
+          <Link
+            href="/settings/roles"
+            className="border-b-2 border-transparent px-3 pb-3 text-xs text-muted-foreground hover:text-foreground"
+          >
+            Roles & permissions
+          </Link>
+        )}
       </div>
       {message && (
         <p
@@ -149,13 +236,24 @@ export function Settings({
             className="panel p-5"
             onSubmit={async (e) => {
               e.preventDefault();
+              if (busy) return;
               setBusy(true);
-              const r = await savePreferences(p);
-              setMessage(
-                r.ok ? "Notification preferences saved." : r.error || "Failed",
-              );
-              setBusy(false);
-              router.refresh();
+              setMessage("");
+              try {
+                const r = await savePreferences(p);
+                setMessage(
+                  r.ok
+                    ? "Notification preferences saved."
+                    : r.error || "Unable to save preferences.",
+                );
+                if (r.ok) router.refresh();
+              } catch {
+                setMessage(
+                  "Could not save preferences. Check your connection and try again.",
+                );
+              } finally {
+                setBusy(false);
+              }
             }}
           >
             <div className="flex items-center justify-between">
@@ -318,15 +416,52 @@ export function Settings({
           </div>
         </div>
       )}
+      {tab === "sounds" && (
+        <SoundSettings
+          profile={profile}
+          preferences={p}
+          companySounds={s.sounds}
+          settings={s}
+          onPreferencesSaved={setP}
+          onCompanySaved={setS}
+        />
+      )}
+      {tab === "reminders" && (
+        <ReminderPolicySettings settings={s} onSaved={setS} />
+      )}
+      {tab === "chat" && <ChatPolicySettings settings={s} onSaved={setS} />}
+      {tab === "email" && emailSettings && (
+        <EmailSettingsPanel settings={emailSettings} log={emailLog} />
+      )}
+      {tab === "employee IDs" && employeeIdSettings && (
+        <EmployeeIdSettingsPanel
+          settings={employeeIdSettings}
+          preview={employeeIdPreview}
+        />
+      )}
       {tab === "company" && (
         <form
           className="panel max-w-4xl p-6"
           onSubmit={async (e) => {
             e.preventDefault();
+            if (busy) return;
             setBusy(true);
-            const r = await saveSettings(s);
-            setMessage(r.ok ? "Company settings saved." : r.error || "Failed");
-            setBusy(false);
+            setMessage("");
+            try {
+              const r = await saveSettings(s);
+              setMessage(
+                r.ok
+                  ? "Company settings saved."
+                  : r.error || "Unable to save settings.",
+              );
+              if (r.ok) router.refresh();
+            } catch {
+              setMessage(
+                "Could not save settings. Check your connection and try again.",
+              );
+            } finally {
+              setBusy(false);
+            }
           }}
         >
           <h2 className="section-title mb-6">
