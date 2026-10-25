@@ -118,7 +118,13 @@ export function CredentialsPanel({
   projects,
   canHistory,
   isAdmin,
+  canEdit = true,
+  canReveal = true,
 }: {
+  /** Add, edit, archive and change passwords (credentials.edit). */
+  canEdit?: boolean;
+  /** Reveal and copy current passwords (credentials.reveal). */
+  canReveal?: boolean;
   client: { id: string; title: string; status: string };
   credentials: Credential[];
   people: Person[];
@@ -140,7 +146,8 @@ export function CredentialsPanel({
     credential: Credential;
   } | null>(null);
   const [toasts, setToasts] = useState<Toast[]>([]);
-  const readOnly = client.status === "Archived";
+  const archivedClient = client.status === "Archived";
+  const readOnly = archivedClient || !canEdit;
 
   const name = (id: string | null) =>
     people.find((p) => p.id === id)?.full_name || "Unknown";
@@ -206,8 +213,15 @@ export function CredentialsPanel({
       </div>
       {readOnly && (
         <p className="notice mb-4 text-xs">
-          This client is archived. Its credentials are kept for reference and
-          cannot be changed.
+          {archivedClient
+            ? "This client is archived. Its credentials are kept for reference and cannot be changed."
+            : "You can view these credentials but not add or change them."}
+          {!canReveal && " Passwords stay hidden because you do not have permission to reveal them."}
+        </p>
+      )}
+      {!readOnly && !canReveal && (
+        <p className="notice mb-4 text-xs">
+          Passwords stay hidden because you do not have permission to reveal or copy them.
         </p>
       )}
 
@@ -325,6 +339,7 @@ export function CredentialsPanel({
                     credential={c}
                     readOnly={readOnly}
                     isAdmin={isAdmin}
+                    canReveal={canReveal}
                     updatedBy={name(c.updated_by)}
                     project={projectName(c.project_id)}
                     notify={notify}
@@ -375,6 +390,7 @@ export function CredentialsPanel({
         <HistoryDialog
           credential={history}
           canHistory={canHistory}
+          canReveal={canReveal}
           notify={notify}
           onClose={() => setHistory(null)}
         />
@@ -471,6 +487,7 @@ function CredentialCard({
   credential: c,
   readOnly,
   isAdmin,
+  canReveal,
   updatedBy,
   project,
   notify,
@@ -483,6 +500,7 @@ function CredentialCard({
   credential: Credential;
   readOnly: boolean;
   isAdmin: boolean;
+  canReveal: boolean;
   updatedBy: string;
   project?: string;
   notify: (text: string, tone?: Toast["tone"]) => void;
@@ -685,6 +703,7 @@ function CredentialCard({
           >
             {revealed === null ? "••••••••••••" : revealed}
           </span>
+          {canReveal && (
           <button
             type="button"
             onClick={toggleReveal}
@@ -700,7 +719,8 @@ function CredentialCard({
               <EyeOff size={15} />
             )}
           </button>
-          <CopyButton label="Copy password" onCopy={copyPassword} />
+          )}
+          {canReveal && <CopyButton label="Copy password" onCopy={copyPassword} />}
         </Field>
       </div>
 
@@ -1010,11 +1030,13 @@ function ChangePasswordDialog({
 function HistoryDialog({
   credential: c,
   canHistory,
+  canReveal,
   notify,
   onClose,
 }: {
   credential: Credential;
   canHistory: boolean;
+  canReveal: boolean;
   notify: (text: string, tone?: Toast["tone"]) => void;
   onClose: () => void;
 }) {
@@ -1046,7 +1068,7 @@ function HistoryDialog({
   }, [c.id]);
 
   const unlocked = Boolean(unlockedUntil && new Date(unlockedUntil) > new Date());
-  const allowed = (v: CredentialVersion) => v.is_current || (canHistory && unlocked);
+  const allowed = (v: CredentialVersion) => (v.is_current && canReveal) || (canHistory && unlocked);
   const match = when && versions ? versionAt(versions, new Date(when)) : null;
 
   async function reveal(v: CredentialVersion) {
@@ -1110,7 +1132,7 @@ function HistoryDialog({
               <div className="flex-1">
                 <label htmlFor="unlock-password" className="flex items-center gap-1.5">
                   <ShieldCheck size={13} className="text-primary" />
-                  Confirm your Techly password to open previous passwords
+                  Confirm your Orbit password to open previous passwords
                 </label>
                 <input
                   id="unlock-password"

@@ -2,47 +2,81 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Paperclip, Download, Loader2, FileCheck2 } from "lucide-react";
+/**
+ * Chunked private upload. Target one of: a record (attachments), a personal
+ * sound, or a chat conversation. Resolves with the stored path. Each piece is
+ * retried on network errors, so large files survive brief connection drops.
+ */
 export async function uploadFile(
   record: string | undefined,
   file: File,
   sound = false,
+  conversation?: string,
+  options: {
+    kind?: "general" | "joining";
+    onProgress?: (sent: number, total: number) => void;
+    signal?: AbortSignal;
+  } = {},
 ) {
   const info = {
-    record,
-    sound,
+    ...(conversation ? { conversation } : { record, sound }),
+    ...(options.kind && options.kind !== "general" ? { kind: options.kind } : {}),
     name: file.name,
-    mime: file.type || (file.name.endsWith(".csv") ? "text/csv" : ""),
+    mime:
+      file.type ||
+      (file.name.toLowerCase().endsWith(".csv")
+        ? "text/csv"
+        : file.name.toLowerCase().endsWith(".pdf")
+          ? "application/pdf"
+          : ""),
     size: file.size,
   };
   const ticketRes = await fetch("/api/uploads", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(info),
+    signal: options.signal,
   });
   const ticket = await ticketRes.json();
   if (!ticketRes.ok) throw Error(ticket.error);
+  options.onProgress?.(0, file.size);
   for (
     let offset = 0, part = 0;
     offset < file.size;
     offset += ticket.chunkSize, part++
   ) {
-    const upload = await fetch(
-      `/api/uploads?upload=${encodeURIComponent(ticket.id)}&part=${part}`,
-      {
-        method: "PUT",
-        headers: { "Content-Type": "application/octet-stream" },
-        body: file.slice(offset, offset + ticket.chunkSize),
-      },
-    );
-    if (!upload.ok) {
-      const result = await upload.json();
-      throw Error(result.error || "File upload failed");
+    const body = file.slice(offset, offset + ticket.chunkSize);
+    for (let attempt = 1; ; attempt++) {
+      try {
+        const upload = await fetch(
+          `/api/uploads?upload=${encodeURIComponent(ticket.id)}&part=${part}`,
+          {
+            method: "PUT",
+            headers: { "Content-Type": "application/octet-stream" },
+            body,
+            signal: options.signal,
+          },
+        );
+        if (upload.ok) break;
+        const result = await upload.json().catch(() => ({}));
+        // Validation errors will not succeed on retry.
+        if (upload.status < 500 || attempt >= 3)
+          throw Object.assign(Error(result.error || "File upload failed"), {
+            final: true,
+          });
+      } catch (e) {
+        if (options.signal?.aborted) throw Error("Upload cancelled");
+        if ((e as { final?: boolean }).final || attempt >= 3) throw e;
+      }
+      await new Promise((r) => setTimeout(r, 800 * attempt));
     }
+    options.onProgress?.(Math.min(offset + ticket.chunkSize, file.size), file.size);
   }
   const done = await fetch("/api/uploads", {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ id: ticket.id }),
+    signal: options.signal,
   });
   const result = await done.json();
   if (!done.ok) throw Error(result.error);
@@ -55,6 +89,9 @@ export type Attachment = {
   size: number;
   verified: boolean;
   uploaded_by: string;
+  created_at?: string;
+  /** "joining" files are shown in the Joining documents section instead. */
+  kind?: "general" | "joining";
 };
 export function Attachments({
   record,

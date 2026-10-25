@@ -26,7 +26,7 @@ export function xlsx(rows: string[][]) {
       '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>',
     ),
     "xl/workbook.xml": strToU8(
-      '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Techly report" sheetId="1" r:id="rId1"/></sheets></workbook>',
+      '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Orbit report" sheetId="1" r:id="rId1"/></sheets></workbook>',
     ),
     "xl/_rels/workbook.xml.rels": strToU8(
       '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>',
@@ -113,9 +113,9 @@ export async function reportFile(
     };
   if (format === "docx") {
     const children = [
-      new Paragraph({ text: "Techly · " + title, heading: HeadingLevel.TITLE }),
+      new Paragraph({ text: "Orbit · " + title, heading: HeadingLevel.TITLE }),
       new Paragraph({
-        text: "Generated " + new Date().toISOString(),
+        text: "A Techly project · Generated " + new Date().toISOString(),
         spacing: { after: 300 },
       }),
     ];
@@ -165,7 +165,7 @@ export async function reportFile(
     function newPage() {
       doc.setFontSize(9);
       doc.setTextColor(120);
-      doc.text(`Techly · ${page}`, 15, 287);
+      doc.text(`Orbit · A Techly project · ${page}`, 15, 287);
       doc.addPage();
       page++;
       y = 20;
@@ -203,7 +203,7 @@ export async function reportFile(
     }
     doc.setFontSize(9);
     doc.setTextColor(120);
-    doc.text(`Techly · ${page}`, 15, 287);
+    doc.text(`Orbit · A Techly project · ${page}`, 15, 287);
     return {
       bytes: new Uint8Array(doc.output("arraybuffer")),
       mime: "application/pdf",

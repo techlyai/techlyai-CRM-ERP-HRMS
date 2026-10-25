@@ -1,12 +1,21 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Plus, X, Bold, Italic, List } from "lucide-react";
 import { moduleMap, type Profile, type BusinessRecord } from "@/lib/modules";
 import { localDate } from "@/lib/domain";
+import { toDateTimeLocal } from "@/lib/reminders";
 import { saveRecord } from "@/lib/actions";
 import { Button } from "./ui/button";
 import { Dialog, DialogContent } from "./ui/dialog";
+import { uploadFile } from "./attachments";
+import { UploadProgress } from "./joining-documents";
+import {
+  formatBytes,
+  joiningDocuments,
+  normalizeJoiningDocuments,
+} from "@/lib/joining";
+import { FileText } from "lucide-react";
 export type Reference = { id: string; title: string; module: string };
 export function RecordForm({
   module,
@@ -28,6 +37,12 @@ export function RecordForm({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [duplicates, setDuplicates] = useState(0);
+  const submitting = useRef(false);
+  // Employee joining PDF chosen in the form; uploaded after the record saves.
+  const [joiningFile, setJoiningFile] = useState<File | null>(null);
+  const [progress, setProgress] = useState<{ sent: number; total: number } | null>(null);
+  const [savedId, setSavedId] = useState<string>();
+  const duplicateRequest = useRef(0);
   const [lines, setLines] = useState<
     { item_id: string; quantity: number; unit_cost: number }[]
   >(
@@ -38,6 +53,42 @@ export function RecordForm({
     }[]) || [{ item_id: "", quantity: 1, unit_cost: 0 }],
   );
   const m = moduleMap[module];
+  useEffect(() => {
+    if (defaultOpen) setOpen(true);
+  }, [defaultOpen]);
+  function changeOpen(next: boolean) {
+    if (submitting.current) return;
+    if (next) {
+      setError("");
+      setJoiningFile(null);
+      setProgress(null);
+      setSavedId(undefined);
+      setDuplicates(0);
+      duplicateRequest.current += 1;
+      setLines(
+        (record?.data.lines as typeof lines) || [
+          { item_id: "", quantity: 1, unit_cost: 0 },
+        ],
+      );
+    }
+    setOpen(next);
+  }
+  async function checkDuplicates(phone: string) {
+    const request = ++duplicateRequest.current;
+    setDuplicates(0);
+    if (!phone.trim()) return;
+    try {
+      const response = await fetch(
+        "/api/leads/duplicates?phone=" + encodeURIComponent(phone),
+      );
+      if (!response.ok) return;
+      const data = (await response.json()) as { ids?: string[] };
+      if (request === duplicateRequest.current)
+        setDuplicates(data.ids?.filter((id) => id !== record?.id).length || 0);
+    } catch {
+      // Duplicate detection is advisory; the form remains usable offline.
+    }
+  }
   function refModule(key: string) {
     if (key === "project_id") return "projects";
     if (key === "purchase_id") return "purchases";
@@ -48,13 +99,13 @@ export function RecordForm({
   return (
     <>
       <Button
-        onClick={() => setOpen(true)}
+        onClick={() => changeOpen(true)}
         variant={record ? "outline" : "default"}
       >
         <Plus size={15} />
         {record ? "Edit record" : `New ${m.singular.toLowerCase()}`}
       </Button>
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog open={open} onOpenChange={changeOpen}>
         <DialogContent
           title={
             record
@@ -66,6 +117,8 @@ export function RecordForm({
             className="mt-6"
             onSubmit={async (e) => {
               e.preventDefault();
+              if (submitting.current) return;
+              submitting.current = true;
               setBusy(true);
               setError("");
               const f = new FormData(e.currentTarget);
@@ -76,6 +129,8 @@ export function RecordForm({
                   if (module === "purchases" && field.key === "lines")
                     data.lines = lines;
                   else if (field.key === "team") data.team = f.getAll("team");
+                  else if (field.key === "joining_documents")
+                    data.joining_documents = f.getAll("joining_documents");
                   else if (field.type === "json")
                     data[field.key] = value ? JSON.parse(value) : undefined;
                   else if (field.type === "number")
@@ -99,17 +154,45 @@ export function RecordForm({
                 });
                 if (!result.ok) setError(result.error || "Unable to save");
                 else {
-                  setOpen(false);
-                  router.push(`/modules/${module}/${result.id}`);
-                  router.refresh();
+                  let uploaded = true;
+                  if (joiningFile && result.id) {
+                    setSavedId(result.id);
+                    setProgress({ sent: 0, total: joiningFile.size });
+                    try {
+                      await uploadFile(result.id, joiningFile, false, undefined, {
+                        kind: "joining",
+                        onProgress: (sent, total) => setProgress({ sent, total }),
+                      });
+                    } catch (uploadError) {
+                      // The employee record is saved; keep the dialog open to explain.
+                      uploaded = false;
+                      setProgress(null);
+                      setError(
+                        "The employee record was saved, but the joining PDF did not upload: " +
+                          (uploadError instanceof Error
+                            ? uploadError.message
+                            : "upload failed") +
+                          ". Open the record to try again.",
+                      );
+                    }
+                  }
+                  if (uploaded) {
+                    setOpen(false);
+                    router.push(`/modules/${module}/${result.id}`);
+                    router.refresh();
+                  }
                 }
               } catch (e) {
                 setError(e instanceof Error ? e.message : "Invalid form");
               }
+              submitting.current = false;
               setBusy(false);
             }}
           >
-            <div className="grid gap-5 md:grid-cols-2">
+            <fieldset
+              disabled={busy}
+              className="grid min-w-0 gap-5 md:grid-cols-2"
+            >
               <div className="md:col-span-2">
                 <label htmlFor="title">{m.singular} name / title *</label>
                 <input
@@ -133,6 +216,12 @@ export function RecordForm({
                     id="owner_id"
                     defaultValue={record?.owner_id || people[0]?.id}
                   >
+                    {record?.owner_id &&
+                      !people.some((p) => p.id === record.owner_id) && (
+                        <option value={record.owner_id}>
+                          Current responsible employee
+                        </option>
+                      )}
                     {people.map((p) => (
                       <option key={p.id} value={p.id}>
                         {p.full_name}
@@ -194,6 +283,79 @@ export function RecordForm({
                       </div>
                     </div>
                   );
+                  if (module === "employees" && field.key === "joining_documents") {
+                  const included = normalizeJoiningDocuments(value);
+                  return (
+                    <div key={field.key} className="md:col-span-2">
+                      <label>Joining documents</label>
+                      <div className="space-y-4 rounded-xl border border-border p-4">
+                        <p className="text-xs leading-5 text-muted-foreground">
+                          Combine these documents into one PDF and upload it.
+                          Tick each document the PDF contains. There is no file
+                          size limit.
+                        </p>
+                        <div className="grid gap-x-4 gap-y-2 sm:grid-cols-2">
+                          {joiningDocuments.map((doc) => (
+                            <label
+                              key={doc}
+                              className="mb-0 flex items-center gap-2 text-xs font-normal"
+                            >
+                              <input
+                                type="checkbox"
+                                name="joining_documents"
+                                value={doc}
+                                defaultChecked={included.includes(doc)}
+                              />
+                              {doc}
+                            </label>
+                          ))}
+                        </div>
+                        {!progress && !savedId ? (
+                          <div className="flex flex-wrap items-center gap-3 border-t border-border pt-4">
+                            <label className="mb-0 inline-flex h-9 cursor-pointer items-center gap-2 rounded-lg border border-border px-3 text-xs font-medium transition-colors hover:border-primary/40 hover:bg-muted">
+                              <FileText size={14} className="text-primary" />
+                              {joiningFile ? "Choose a different PDF" : record ? "Upload a new joining PDF" : "Choose joining PDF"}
+                              <input
+                                type="file"
+                                accept="application/pdf,.pdf"
+                                className="sr-only"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0] || null;
+                                  if (file && !/\.pdf$/i.test(file.name)) {
+                                    setError("Joining documents must be a single PDF file.");
+                                    e.target.value = "";
+                                    return;
+                                  }
+                                  setError("");
+                                  setJoiningFile(file);
+                                }}
+                              />
+                            </label>
+                            {joiningFile && (
+                              <span className="flex min-w-0 items-center gap-2 text-xs">
+                                <span className="truncate font-medium">{joiningFile.name}</span>
+                                <span className="text-muted-foreground">
+                                  {formatBytes(joiningFile.size)}
+                                </span>
+                                <button
+                                  type="button"
+                                  aria-label="Remove selected PDF"
+                                  onClick={() => setJoiningFile(null)}
+                                  className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                                >
+                                  <X size={13} />
+                                </button>
+                              </span>
+                            )}
+                          </div>
+                        ) : null}
+                        {progress && (
+                          <UploadProgress sent={progress.sent} total={progress.total} />
+                        )}
+                      </div>
+                    </div>
+                  );
+                }
                 if (module === "purchases" && field.key === "lines")
                   return (
                     <div key="lines" className="md:col-span-2">
@@ -324,26 +486,6 @@ export function RecordForm({
                         name={field.key}
                         id={field.key}
                         required={field.required}
-                        onBlur={
-                          module === "leads" && field.key === "phone"
-                            ? async (e) => {
-                                try {
-                                  const res = await fetch(
-                                    "/api/leads/duplicates?phone=" +
-                                      encodeURIComponent(e.currentTarget.value),
-                                  );
-                                  const data = await res.json();
-                                  setDuplicates(
-                                    data.ids?.filter(
-                                      (id: string) => id !== record?.id,
-                                    ).length || 0,
-                                  );
-                                } catch {
-                                  setDuplicates(0);
-                                }
-                              }
-                            : undefined
-                        }
                         defaultValue={String(value || "")}
                       >
                         <option value="">Select an option</option>
@@ -361,6 +503,17 @@ export function RecordForm({
                         <option value="">
                           Select {ref ? "a record" : "a person"}
                         </option>
+                        {value &&
+                        !(
+                          ref
+                            ? references.filter((r) => r.module === ref)
+                            : people
+                        ).some((option) => option.id === value) ? (
+                          <option value={String(value)}>
+                            Current {ref ? "linked record" : "person"}{" "}
+                            (unavailable)
+                          </option>
+                        ) : null}
                         {ref
                           ? references
                               .filter((r) => r.module === ref)
@@ -395,14 +548,23 @@ export function RecordForm({
                         min={field.min}
                         step={field.type === "number" ? "0.01" : undefined}
                         required={field.required}
+                        onBlur={
+                          module === "leads" && field.key === "phone"
+                            ? (event) =>
+                                checkDuplicates(event.currentTarget.value)
+                            : undefined
+                        }
+                        onChange={
+                          module === "leads" && field.key === "phone"
+                            ? () => {
+                                duplicateRequest.current += 1;
+                                setDuplicates(0);
+                              }
+                            : undefined
+                        }
                         defaultValue={
                           field.type === "datetime" && value
-                            ? new Date(
-                                new Date(String(value)).getTime() -
-                                  new Date().getTimezoneOffset() * 60000,
-                              )
-                                .toISOString()
-                                .slice(0, 16)
+                            ? toDateTimeLocal(String(value))
                             : typeof value === "object"
                               ? JSON.stringify(value)
                               : value !== undefined
@@ -422,7 +584,7 @@ export function RecordForm({
                   </div>
                 );
               })}
-            </div>
+            </fieldset>
             {duplicates > 0 && (
               <p
                 role="status"
@@ -439,17 +601,38 @@ export function RecordForm({
               </p>
             )}
             <div className="mt-6 flex justify-end gap-3 border-t pt-5">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setOpen(false)}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" disabled={busy}>
-                {busy && <Loader2 size={14} className="animate-spin" />}
-                {record ? "Save changes" : "Create record"}
-              </Button>
+              {savedId && !progress ? (
+                // Saved, but the PDF failed: never offer to save again (would duplicate).
+                <Button
+                  type="button"
+                  onClick={() => {
+                    setOpen(false);
+                    router.push(`/modules/${module}/${savedId}`);
+                    router.refresh();
+                  }}
+                >
+                  Open employee record
+                </Button>
+              ) : (
+                <>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={busy}
+                    onClick={() => changeOpen(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={busy}>
+                    {busy && <Loader2 size={14} className="animate-spin" />}
+                    {progress
+                      ? "Uploading PDF…"
+                      : record
+                        ? "Save changes"
+                        : "Create record"}
+                  </Button>
+                </>
+              )}
             </div>
           </form>
         </DialogContent>

@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { useState } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -32,6 +32,7 @@ import { RecordForm, RichText, type Reference } from "./record-form";
 import { Attachments, type Attachment } from "./attachments";
 import { Dialog, DialogContent } from "./ui/dialog";
 import { DocumentReview } from "./document-review";
+import { JoiningDocuments } from "./joining-documents";
 export type Question = {
   id: string;
   body: string;
@@ -93,35 +94,55 @@ export function RecordDetails({
   initialTab?: string;
 }) {
   const router = useRouter();
-  const [busy, setBusy] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [refreshing, startTransition] = useTransition();
+  const busy = saving || refreshing;
+  const actionInFlight = useRef(false);
   const [error, setError] = useState("");
   const [dialog, setDialog] = useState("");
   const [parent, setParent] = useState<string>();
   const [key, setKey] = useState("");
   const [tab, setTab] = useState(
-    initialTab === "credentials" && credentials ? "credentials" : "details",
+    initialTab &&
+      [
+        "details",
+        "conversation",
+        "history",
+        ...(credentials ? ["credentials"] : []),
+      ].includes(initialTab)
+      ? initialTab
+      : "details",
   );
   const m = moduleMap[r.module];
+  // Joining PDFs have their own section; newest first.
+  const joiningFiles = files
+    .filter((f) => f.kind === "joining")
+    .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+  const generalFiles = files.filter((f) => f.kind !== "joining");
   function open(action: string, parentId?: string) {
+    if (actionInFlight.current || refreshing) return;
     setDialog(action);
     setParent(parentId);
     setKey(crypto.randomUUID());
     setError("");
   }
   async function run(fn: () => Promise<Result>) {
-    setBusy(true);
+    if (actionInFlight.current || refreshing) return;
+    actionInFlight.current = true;
+    setSaving(true);
     setError("");
     try {
       const result = await fn();
       if (!result.ok) setError(result.error || "Action failed");
       else {
         setDialog("");
-        router.refresh();
+        startTransition(() => router.refresh());
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Request failed");
     }
-    setBusy(false);
+    actionInFlight.current = false;
+    setSaving(false);
   }
   const action = (a: string, note?: string) =>
     recordAction({ id: r.id, version: r.version, action: a, note });
@@ -298,7 +319,7 @@ export function RecordDetails({
               if (t === "conversation") markQuestionsRead(r.id);
               // Keep the tab in the address so a refresh returns to it.
               const url = new URL(window.location.href);
-              if (t === "credentials") url.searchParams.set("tab", t);
+              if (t !== "details") url.searchParams.set("tab", t);
               else url.searchParams.delete("tab");
               window.history.replaceState(null, "", url);
             }}
@@ -316,13 +337,28 @@ export function RecordDetails({
         className={`grid gap-6 xl:grid-cols-[1.7fr_1fr] ${tab === "credentials" ? "hidden" : ""}`}
       >
         <div className="space-y-5">
+          {tab === "details" && r.module === "employees" && (
+            <JoiningDocuments
+              record={r.id}
+              included={r.data.joining_documents}
+              files={joiningFiles}
+              people={people}
+              canUpload={canUpload}
+            />
+          )}
           {tab === "details" && (
             <section className="panel p-5">
               <h2 className="section-title mb-5">Record details</h2>
               <dl className="grid gap-6 md:grid-cols-2">
                 {Object.entries(r.data)
                   .filter(
-                    ([k]) => !["renewal_history", "team", "lines"].includes(k),
+                    ([k]) =>
+                      ![
+                        "renewal_history",
+                        "team",
+                        "lines",
+                        "joining_documents",
+                      ].includes(k),
                   )
                   .map(([k, v]) => {
                     const f = m.fields.find((f) => f.key === k);
@@ -563,7 +599,11 @@ export function RecordDetails({
           )}
         </div>
         <div className="space-y-5">
-          <Attachments record={r.id} files={files} canUpload={canUpload} />
+          <Attachments
+            record={r.id}
+            files={generalFiles}
+            canUpload={canUpload}
+          />
           <DocumentReview
             files={files}
             canApprove={canApprove}
@@ -615,32 +655,34 @@ export function RecordDetails({
       <Dialog
         open={Boolean(dialog)}
         onOpenChange={(open) => {
-          if (!open) setDialog("");
+          if (!open && !busy) setDialog("");
         }}
       >
         <DialogContent
           title={
             dialog === "share"
               ? "Share record"
-              : dialog === "archive"
-                ? "Archive record"
-                : dialog === "receive"
-                  ? "Confirm purchase receipt"
-                  : dialog === "payment"
-                    ? "Record a payment"
-                    : dialog === "stock"
-                      ? "Record stock movement"
-                      : dialog === "renew"
-                        ? "Complete renewal"
-                        : dialog === "snooze"
-                          ? "Snooze reminders"
-                          : dialog === "reject"
-                            ? "Reject with a reason"
-                            : dialog === "clarify"
-                              ? "Request clarification"
-                              : dialog === "reply"
-                                ? "Reply to question"
-                                : "Ask a question"
+              : dialog === "cancel-renewal"
+                ? "Cancel renewal"
+                : dialog === "archive"
+                  ? "Archive record"
+                  : dialog === "receive"
+                    ? "Confirm purchase receipt"
+                    : dialog === "payment"
+                      ? "Record a payment"
+                      : dialog === "stock"
+                        ? "Record stock movement"
+                        : dialog === "renew"
+                          ? "Complete renewal"
+                          : dialog === "snooze"
+                            ? "Snooze reminders"
+                            : dialog === "reject"
+                              ? "Reject with a reason"
+                              : dialog === "clarify"
+                                ? "Request clarification"
+                                : dialog === "reply"
+                                  ? "Reply to question"
+                                  : "Ask a question"
           }
         >
           <form

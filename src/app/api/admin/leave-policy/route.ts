@@ -1,13 +1,13 @@
 export const dynamic = "force-dynamic";
 import { NextResponse, type NextRequest } from "next/server";
-import { context } from "@/lib/database";
+import { context, requirePermission } from "@/lib/database";
 import { z } from "zod";
 import { requireSameOrigin } from "@/lib/request-origin";
 export async function POST(req: NextRequest) {
   try {
     requireSameOrigin(req);
-    const { db, profile } = await context();
-    if (profile.role !== "super_admin") throw Error("Permission denied");
+    const { db } = await context();
+    await requirePermission(db, "settings", "leave_policy");
     const p = z
       .object({
         type: z.string().max(100),

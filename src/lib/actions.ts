@@ -1,5 +1,5 @@
 "use server";
-import { context, serviceDB, setSession } from "./database";
+import { context, serviceDB, setSession, requirePermission } from "./database";
 import {
   authenticate,
   revokeSession,
@@ -8,6 +8,12 @@ import {
 } from "./auth";
 import { moduleMap, validateRecord, actions } from "./modules";
 import { normalizePhone } from "./domain";
+import {
+  consumeInvite,
+  inviteMessages,
+  sendWelcomeInvite,
+  validInviteToken,
+} from "./invites";
 import { cookies, headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -317,6 +323,7 @@ export async function savePreferences(data: unknown): Promise<Result> {
             sound: z.string().max(1000).optional(),
           }),
         ),
+        default_sound: z.string().max(1000).optional(),
         snoozed_until: z.string().datetime().optional(),
       })
       .strict()
@@ -353,8 +360,8 @@ export async function subscribePush(subscription: unknown): Promise<Result> {
 }
 export async function saveSettings(data: unknown): Promise<Result> {
   return safely(async () => {
-    const { db, profile } = await context();
-    if (profile.role !== "super_admin") throw Error("Permission denied");
+    // Each changed settings group is authorized by update_settings in the database.
+    const { db } = await context();
     const time = z
       .string()
       .regex(/^\d{2}:\d{2}$/)
@@ -392,6 +399,47 @@ export async function saveSettings(data: unknown): Promise<Result> {
         ),
         renewal_days: z.number().int().min(1).max(365),
         reminder_intervals: z.array(z.number().int().min(0).max(365)),
+        // Smart reminder policy
+        reminder_yearly_advance_months: z.number().int().min(0).max(12).default(1),
+        reminder_monthly_advance_days: z.number().int().min(0).max(90).default(14),
+        reminder_repeat_daily: z.boolean().default(true),
+        reminder_default_recurrence: z
+          .enum(["none", "daily", "weekly", "monthly", "yearly", "custom"])
+          .default("none"),
+        reminder_snooze_options: z
+          .array(z.number().int().min(1).max(525600))
+          .max(10)
+          .default([10, 30, 60, 1440, 10080]),
+        reminder_escalate_days: z.number().int().min(0).max(90).default(3),
+        notification_channels: z
+          .object({
+            in_app: z.boolean(),
+            sound: z.boolean(),
+            push: z.boolean(),
+            email: z.boolean(),
+          })
+          .default({ in_app: true, sound: true, push: true, email: true }),
+        // Company-wide sound defaults
+        sounds: z
+          .object({
+            default: z.string().max(1000),
+            categories: z.record(z.string().max(1000)),
+          })
+          .default({ default: "builtin:chime", categories: {} }),
+        // Chat policy
+        chat: z
+          .object({
+            group_creation: z.enum(["admins", "managers", "everyone"]),
+            direct_messages: z.enum(["everyone", "team"]),
+            edit_minutes: z.number().int().min(-1).max(1440),
+            admin_review: z.boolean(),
+          })
+          .default({
+            group_creation: "managers",
+            direct_messages: "everyone",
+            edit_minutes: 15,
+            admin_review: false,
+          }),
       })
       .strict()
       .parse(data);
@@ -434,17 +482,23 @@ export async function updateProfile(input: {
   manager: string;
   role: string;
   active: boolean;
+  /** Omit to leave the address unchanged; "" clears it. */
+  email?: string;
 }): Promise<Result> {
   return safely(async () => {
     const { db } = await context();
+    const id = uuid.parse(input.id);
+    const email =
+      input.email === undefined ? undefined : normalizeEmail(input.email);
     await db.rpc("set_profile", {
-      p_id: uuid.parse(input.id),
+      p_id: id,
       p_name: z.string().min(1).max(200).parse(input.name),
       p_department: input.department,
       p_manager: input.manager ? uuid.parse(input.manager) : null,
       p_role: z.enum(["super_admin", "manager", "employee"]).parse(input.role),
       p_active: input.active,
     });
+    if (email !== undefined) await setEmail(db, id, email);
     revalidatePath("/");
     return { ok: true };
   });
@@ -455,17 +509,26 @@ export async function createUser(input: {
   role: string;
   department?: string;
   manager?: string;
+  email?: string;
 }): Promise<Result> {
   return safely(async () => {
-    const { profile, token } = await context();
-    if (profile.role !== "super_admin") throw Error("Permission denied");
+    const { db, token } = await context();
     const phone = normalizePhone(input.phone);
     const name = z.string().min(1).max(200).parse(input.name);
     const role = z
       .enum(["super_admin", "manager", "employee"])
       .parse(input.role);
+    const email = normalizeEmail(input.email);
+    if (email) {
+      const taken = await db.select<{ id: string }>(
+        "profiles",
+        "select=id&email=eq." + encodeURIComponent(email) + "&limit=1",
+      );
+      if (taken.length)
+        throw Error("This email address is already in use by another user.");
+    }
     const password = randomBytes(18).toString("base64url") + "Aa1!";
-    await provisionUser(
+    const id = await provisionUser(
       token,
       {
         phone,
@@ -476,8 +539,26 @@ export async function createUser(input: {
       },
       password,
     );
+    if (email) {
+      await setEmail(db, id, email);
+      // The welcome email carries an activation link, never the temporary password.
+      const idSettings = await db.select<{ data: { welcome_email?: boolean } }>(
+        "employee_id_settings",
+        "select=data&id=eq.1",
+      );
+      if (idSettings[0]?.data.welcome_email !== false)
+        await sendWelcomeInvite(id).catch((e) =>
+          console.error(
+            JSON.stringify({
+              event: "welcome_invite_failed",
+              user: id,
+              message: e instanceof Error ? e.message : "Unknown",
+            }),
+          ),
+        );
+    }
     revalidatePath("/");
-    return { ok: true, message: password };
+    return { ok: true, id, message: password };
   });
 }
 export async function verifyAttachment(
@@ -547,5 +628,71 @@ export async function grantLeave(input: {
     });
     revalidatePath("/");
     return { ok: true };
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Email addresses, activation invites and account activation
+// ---------------------------------------------------------------------------
+function normalizeEmail(value: string | undefined) {
+  const email = (value || "").trim().toLowerCase();
+  if (!email) return "";
+  return z.string().email("Enter a valid email address").max(254).parse(email);
+}
+async function setEmail(
+  db: Awaited<ReturnType<typeof context>>["db"],
+  id: string,
+  email: string,
+) {
+  try {
+    await db.rpc("set_profile_email", { p_id: id, p_email: email });
+  } catch (e) {
+    if (e instanceof Error && /profiles_email_unique|duplicate key/i.test(e.message))
+      throw Error("This email address is already in use by another user.");
+    throw e;
+  }
+}
+// Same rules as changePassword, for activation links.
+const strongPassword = z
+  .string()
+  .min(12, "Use at least 12 characters")
+  .max(128)
+  .refine(
+    (p) => /[a-z]/.test(p) && /[A-Z]/.test(p) && /\d/.test(p),
+    "Use upper and lower case letters and a number",
+  );
+/** Admin: issues a fresh activation link and queues the welcome email again. */
+export async function resendInvite(userId: string): Promise<Result> {
+  return safely(async () => {
+    const { db } = await context();
+    await requirePermission(db, "users", "edit", uuid.parse(userId));
+    const result = await sendWelcomeInvite(uuid.parse(userId));
+    if (!result.queued)
+      throw Error(result.reason || "The invite could not be queued");
+    revalidatePath("/");
+    return {
+      ok: true,
+      message: `Activation link queued for ${result.recipient}. The scheduler sends it on its next run; the previous link no longer works.`,
+    };
+  });
+}
+/** Public: sets the password for an invited account and signs the person in. */
+export async function activateAccount(
+  token: string,
+  password: string,
+): Promise<Result> {
+  return safely(async () => {
+    if (typeof token !== "string" || !validInviteToken(token))
+      throw Error(inviteMessages.invalid);
+    strongPassword.parse(password);
+    const ip = headers().get("x-forwarded-for")?.split(",")[0] || "local";
+    const key = createHash("sha256").update("activate:" + ip).digest("hex");
+    const db = serviceDB();
+    const allowed = await db.rpc<boolean>("login_rate_limit", { p_key: key });
+    if (!allowed) throw Error("Too many attempts. Try again in 15 minutes.");
+    const session = await consumeInvite(token, password);
+    await db.rpc("clear_login_limits", { p_keys: [key] });
+    await setSession(session.token);
+    return { ok: true, id: session.userId };
   });
 }

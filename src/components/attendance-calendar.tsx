@@ -2,16 +2,23 @@
 import { CalendarDays } from "lucide-react";
 import { type BusinessRecord } from "@/lib/modules";
 import { Status } from "./ui/status";
+import { attendanceDayStatus } from "@/lib/attendance-calendar";
 export function AttendanceCalendar({
   month,
   records,
   holidays,
   workingDays,
+  specialDays,
+  today,
+  timezone,
 }: {
   month: string;
   records: BusinessRecord[];
   holidays: string[];
   workingDays: number[];
+  specialDays: { date: string; working: boolean }[];
+  today: string;
+  timezone: string;
 }) {
   const [year, m] = month.split("-").map(Number);
   const first = new Date(year, m - 1, 1);
@@ -26,7 +33,7 @@ export function AttendanceCalendar({
           <CalendarDays size={17} className="text-primary" />
           My monthly attendance
         </h2>
-        <form className="flex items-center gap-2">
+        <form key={month} className="flex items-center gap-2">
           <input
             aria-label="Attendance month"
             type="month"
@@ -55,18 +62,16 @@ export function AttendanceCalendar({
           const day = i + 1;
           const date = `${month}-${String(day).padStart(2, "0")}`;
           const record = records.find((r) => r.data.date === date);
-          const weekday = new Date(year, m - 1, day).getDay();
-          const status =
-            record?.status ||
-            (holidays.includes(date)
-              ? "Holiday"
-              : !workingDays.includes(weekday)
-                ? "Day off"
-                : date < new Date().toLocaleDateString("en-CA")
-                  ? "Not recorded"
-                  : "Upcoming");
+          const status = attendanceDayStatus({
+            date,
+            today,
+            recordedStatus: record?.status,
+            holidays,
+            workingDays,
+            specialDays,
+          });
           const title = record
-            ? `${status} · ${record.data.clock_in ? new Date(String(record.data.clock_in)).toLocaleTimeString("en-IN") : "No clock-in"}`
+            ? `${status} · ${record.data.clock_in ? new Date(String(record.data.clock_in)).toLocaleTimeString("en-IN", { timeZone: timezone }) : "No clock-in"}`
             : status;
           return (
             <div

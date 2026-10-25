@@ -90,7 +90,7 @@ export default function LoginPage() {
             <span className="text-accent">connect.</span>
           </h1>
           <p className="mt-6 max-w-md text-[15px] leading-7 text-navy-foreground/65">
-            Techly brings people, projects, customers and operations into one
+            Orbit brings people, projects, customers and operations into one
             place, so every day starts with a clear picture.
           </p>
           <div className="mt-10 grid grid-cols-3 gap-3">
@@ -110,7 +110,7 @@ export default function LoginPage() {
         </div>
 
         <div className="relative flex items-center justify-between text-xs text-navy-foreground/50">
-          <span>© {new Date().getFullYear()} Techly</span>
+          <span>© {new Date().getFullYear()} Techly · Orbit</span>
           <span className="flex items-center gap-1.5">
             <ShieldCheck size={14} />
             Private company workspace
