@@ -11,7 +11,7 @@ export default async function WorkspaceLayout({
   children: React.ReactNode;
 }) {
   const { db, profile } = await context();
-  const [permissions, notifications, prefs, settings] = await Promise.all([
+  const [permissions, notifications, prefs, settings, fieldEmployee] = await Promise.all([
     grants(db),
     db.select<{ id: string }>(
       "notifications",
@@ -25,6 +25,9 @@ export default async function WorkspaceLayout({
       "settings",
       "select=data&id=eq.1",
     ),
+    db
+      .run(async (c) => (await c.query("select 1 from public.field_assignments where user_id=$1", [profile.id])).rowCount === 1)
+      .catch(() => false),
   ]);
   const company = settings[0]?.data;
   return (
@@ -39,6 +42,10 @@ export default async function WorkspaceLayout({
         audit: can(profile, permissions, "audit", "view"),
         permissions: can(profile, permissions, "users", "permissions"),
         chat: can(profile, permissions, "chat", "view"),
+        field:
+          fieldEmployee ||
+          can(profile, permissions, "field", "view") ||
+          can(profile, permissions, "field", "manage"),
       }}
     >
       {children}

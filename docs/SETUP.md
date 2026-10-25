@@ -43,6 +43,36 @@ powershell -NoProfile -File scripts/local-postgres.ps1 start -PostgresBin "C:\Pr
 
 The `create-admin` command prints the **actual randomly generated temporary password only after committing the account**. The example phone is an application login identifier; no SMS is sent. Use your real administrator's phone instead if preferred. There is no fixed or default password. First login requires changing the temporary password. Add subsequent users through Users & access.
 
+### Office locations and GPS attendance
+
+After signing in as a Super Admin, open Settings → Office locations to add each office (name, address, latitude, longitude, geofence radius). The first office becomes the default for anyone without an assignment. Assign people to offices on the same page; a per-person radius override and a work-from-home allowance are optional. Everyone then checks in and out from the card at the top of the dashboard. Browsers only share location over HTTPS (or on `localhost`). Maps are links to OpenStreetMap unless `NEXT_PUBLIC_ATTENDANCE_MAP=openstreetmap` is set at build time, which embeds them.
+
+Run `node --env-file=.env.database scripts/run-ts.cjs scripts/verify-attendance.ts` against a test database to check the geofence and permission rules.
+
+### Field operations
+
+Open Field operations → Settings as a Super Admin to add field sites (customer locations with a geofence) and turn field tracking on for individual employees, choosing their Team Leader, Reporting Admin, schedule, location interval, sites, photo policy and any extra viewers. Then grant the Team Leaders and Admins the field permissions they need in Settings → Roles & permissions (`View field sessions…`, `Review GPS photos…`, `Approve, reject or escalate field reports`). Field employees check in for attendance, then start a field session on the Field operations page and keep it open while working. Run `node --env-file=.env.database scripts/run-ts.cjs scripts/verify-field.ts` against a test database to check the rules.
+
+### Development and test accounts
+
+For local development or an isolated test database you can create five shared test accounts instead of real users:
+
+```powershell
+npm run seed:dev-accounts
+```
+
+| Username | Role | Name |
+| --- | --- | --- |
+| `superadmin` | Super Admin | Super Admin |
+| `admin` | Admin | Admin |
+| `employee1` … `employee3` | Employee | Employee 1 … Employee 3 |
+
+The accounts, roles, departments and placeholder phone numbers are defined in one file, `scripts/dev-accounts.json`. The password is not stored there: the seed uses `DEV_ACCOUNT_PASSWORD`, or `123` when it is unset outside production (local and isolated testing only). Passwords are stored only as scrypt hashes. Sign in with the username (or the placeholder phone) on the normal login page.
+
+The seed is idempotent: accounts that already exist (matched by username or phone) are left unchanged, including their passwords. Run `npm run seed:dev-accounts -- --reset-passwords` to set them back to the seed password, or `-- --config path/to/file.json` to use another list. The seed refuses to run with `NODE_ENV=production`, and seeded accounts are flagged as weak: the server rejects their sign-in in production unless `ALLOW_DEV_ACCOUNTS=true` is set for an isolated test deployment. The flag clears as soon as the password is changed, so changing a seeded account's password makes it a normal account. Never seed these accounts into a production database; create real administrators with `create-admin` instead.
+
+Admins start with no module access. Grant what the `admin` account may use from Settings → Roles & permissions. Usernames, names, roles, status and passwords can be changed later in Users & access (Manage → Reset password); employee IDs are edited on the employee record.
+
 Open http://localhost:3000. Stop only this database with `npm run db:stop`; start it again with `npm run db:start`.
 
 ## Existing standalone PostgreSQL server

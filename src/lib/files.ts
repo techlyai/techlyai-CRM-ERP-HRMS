@@ -11,7 +11,7 @@ export const fileTypes: Record<string, string[]> = {
   "audio/mpeg": ["mp3"],
   "audio/wav": ["wav"],
 };
-export type FileKind = "general" | "joining";
+export type FileKind = "general" | "joining" | "field_photo" | "field_report";
 /** Files above this size are stored in chunks and streamed, never held whole in memory. */
 export const INLINE_LIMIT = 20 * 1024 * 1024;
 
@@ -44,6 +44,8 @@ export function validateFile(
       );
     return;
   }
+  if (kind === "field_photo" && !["image/jpeg", "image/png", "image/webp"].includes(mime))
+    throw Error("Field photos must be JPG, PNG or WebP images.");
   if (!fileTypes[mime] || !fileTypes[mime].includes(extension))
     throw Error("Use JPG, PNG, WebP, PDF, DOCX, XLSX, CSV, MP3, or WAV files.");
   if (sound && !mime.startsWith("audio/"))

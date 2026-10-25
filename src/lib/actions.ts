@@ -1,13 +1,14 @@
 "use server";
 import { context, serviceDB, setSession, requirePermission } from "./database";
 import {
+  resetPasswordByAdmin,
   authenticate,
   revokeSession,
   replacePassword,
   provisionUser,
 } from "./auth";
 import { moduleMap, validateRecord, actions } from "./modules";
-import { normalizePhone } from "./domain";
+import { loginIdentity, normalizePhone } from "./domain";
 import {
   consumeInvite,
   inviteMessages,
@@ -43,26 +44,28 @@ async function safely(fn: () => Promise<Result>): Promise<Result> {
   }
 }
 export async function login(input: {
+  /** Phone number or username. */
   phone: string;
   password: string;
 }): Promise<Result> {
   return safely(async () => {
     z.string().min(1).max(200).parse(input.password);
-    const phone = normalizePhone(input.phone);
+    const identity = loginIdentity(z.string().min(1).max(200).parse(input.phone));
+    const key = "phone" in identity ? "phone:" + identity.phone : "user:" + identity.username;
     const ip = headers().get("x-forwarded-for")?.split(",")[0] || "local";
     const hash = (s: string) => createHash("sha256").update(s).digest("hex");
     const db = serviceDB();
     const valid = await db.rpc<boolean>("login_rate_limit", {
-      p_key: hash("phone:" + phone),
+      p_key: hash(key),
     });
     const ipValid = await db.rpc<boolean>("login_rate_limit", {
-      p_key: hash("ip:" + ip + ":" + phone),
+      p_key: hash("ip:" + ip + ":" + key),
     });
     if (!valid || !ipValid)
       throw Error("Too many attempts. Try again in 15 minutes.");
-    const session = await authenticate(phone, input.password);
+    const session = await authenticate(identity, input.password);
     await db.rpc("clear_login_limits", {
-      p_keys: [hash("phone:" + phone), hash("ip:" + ip + ":" + phone)],
+      p_keys: [hash(key), hash("ip:" + ip + ":" + key)],
     });
     await setSession(session.token);
     return { ok: true };
@@ -384,6 +387,7 @@ export async function saveSettings(data: unknown): Promise<Result> {
         attendance_reminder: time,
         eod_reminder: time,
         eod_deadline: time,
+        // Legacy single-office keys: kept unchanged; offices live in Settings → Office locations.
         office_lat: z.number().min(-90).max(90).nullable(),
         office_lng: z.number().min(-180).max(180).nullable(),
         geofence_radius: z.number().min(10).max(50000),
@@ -398,6 +402,7 @@ export async function saveSettings(data: unknown): Promise<Result> {
           }),
         ),
         renewal_days: z.number().int().min(1).max(365),
+        location_retention_days: z.number().int().min(30).max(3650).default(365),
         reminder_intervals: z.array(z.number().int().min(0).max(365)),
         // Smart reminder policy
         reminder_yearly_advance_months: z.number().int().min(0).max(12).default(1),
@@ -443,8 +448,6 @@ export async function saveSettings(data: unknown): Promise<Result> {
       })
       .strict()
       .parse(data);
-    if (s.enforce_geofence && (s.office_lat === null || s.office_lng === null))
-      throw Error("Set office coordinates before enforcing geofence");
     await db.rpc("update_settings", { p_data: s });
     revalidatePath("/");
     return { ok: true };
@@ -484,6 +487,8 @@ export async function updateProfile(input: {
   active: boolean;
   /** Omit to leave the address unchanged; "" clears it. */
   email?: string;
+  /** Omit to leave unchanged; "" removes the username. */
+  username?: string;
 }): Promise<Result> {
   return safely(async () => {
     const { db } = await context();
@@ -499,6 +504,11 @@ export async function updateProfile(input: {
       p_active: input.active,
     });
     if (email !== undefined) await setEmail(db, id, email);
+    if (input.username !== undefined)
+      await db.rpc("set_profile_username", {
+        p_id: id,
+        p_username: z.string().trim().max(40).parse(input.username),
+      });
     revalidatePath("/");
     return { ok: true };
   });
@@ -510,6 +520,7 @@ export async function createUser(input: {
   department?: string;
   manager?: string;
   email?: string;
+  username?: string;
 }): Promise<Result> {
   return safely(async () => {
     const { db, token } = await context();
@@ -539,6 +550,11 @@ export async function createUser(input: {
       },
       password,
     );
+    if (input.username?.trim())
+      await db.rpc("set_profile_username", {
+        p_id: id,
+        p_username: z.string().trim().max(40).parse(input.username),
+      });
     if (email) {
       await setEmail(db, id, email);
       // The welcome email carries an activation link, never the temporary password.
@@ -694,5 +710,17 @@ export async function activateAccount(
     await db.rpc("clear_login_limits", { p_keys: [key] });
     await setSession(session.token);
     return { ok: true, id: session.userId };
+  });
+}
+/**
+ * Administrator password reset. Returns a one-time temporary password that is
+ * shown once to the administrator; the user must replace it at next sign-in.
+ */
+export async function resetUserPassword(userId: string): Promise<Result> {
+  return safely(async () => {
+    const { token } = await context();
+    const password = await resetPasswordByAdmin(token, uuid.parse(userId));
+    revalidatePath("/users");
+    return { ok: true, message: password };
   });
 }

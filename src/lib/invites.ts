@@ -103,7 +103,7 @@ export async function consumeInvite(token: string, newPassword: string) {
     if (row.expired) throw Error(inviteMessages.expired);
     if (!row.active) throw Error(inviteMessages.inactive);
     const userId = row.user_id as string;
-    await c.query("update private.accounts set password_hash=$1 where id=$2", [
+    await c.query("update private.accounts set password_hash=$1,weak_password=false,password_changed_at=now() where id=$2", [
       hash,
       userId,
     ]);

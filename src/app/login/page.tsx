@@ -128,7 +128,7 @@ export default function LoginPage() {
             Welcome back
           </h2>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            Sign in with your phone number to open your workspace.
+            Sign in with your username or phone number to open your workspace.
           </p>
           {!ready && (
             <div className="mt-6 rounded-lg border border-warning/40 bg-warning/10 p-4 text-sm">
