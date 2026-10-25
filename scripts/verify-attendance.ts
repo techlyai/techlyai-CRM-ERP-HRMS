@@ -262,6 +262,22 @@ async function main() {
       await rejects(() => saveOffice(sup, { name: `Bengaluru ${tag}`, ...BENGALURU, radius_m: 100, is_default: true, active: false }, bengaluru), /default office must be active/);
       await saveOffice(sup, { name: `Bengaluru ${tag}`, ...BENGALURU, radius_m: 100, is_default: false }, bengaluru);
     });
+    await check("Check-in works on a day the scheduler marked Holiday, Leave or Absent", async () => {
+      const h = await mkUser("Geo Holiday", "employee", "Ops");
+      await assign(sup, h, madurai);
+      const today = (await q<{ d: string }>("select (now() at time zone (select data->>'timezone' from public.settings where id=1))::date::text d"))[0].d;
+      // What the scheduler inserts after office hours for someone without attendance.
+      const placeholder = (await q<{ id: string }>("insert into public.records(module,title,status,owner_id,created_by,data) values('attendance','Attendance · '||$2,'Holiday',$1,$1,$3) returning id", [
+        h, today, JSON.stringify({ date: today, source: "scheduler" })]))[0].id;
+      const id = await clock(h, { action: "in", at: near(MADURAI) });
+      assert.equal(id, placeholder, "the placeholder row is filled, not duplicated");
+      const r = await record(id);
+      assert.ok(["Present", "Late"].includes(r.status));
+      assert.equal(r.data.scheduled_status, "Holiday");
+      assert.equal(r.data.verified, true);
+      await rejects(() => clock(h, { action: "in", at: near(MADURAI) }), /already checked in/);
+      await clock(h, { action: "out", at: near(MADURAI) });
+    });
     await check("Company settings can no longer change geofences", async () => {
       await rejects(() => as(sup, "select public.update_settings((select data||'{\"geofence_radius\":999}' from public.settings where id=1))"), /managed in Settings/);
     });
