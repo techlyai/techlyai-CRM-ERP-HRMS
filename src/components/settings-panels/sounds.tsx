@@ -44,7 +44,7 @@ const groupHints: Record<string, string> = {
   Reports: "Daily report submissions, questions and decisions.",
   Business: "Renewals, vendor payments and lead follow-ups.",
   Work: "Tasks, projects and attendance.",
-  Operations: "Asset maintenance and stock levels.",
+  Operations: "Asset maintenance, stock levels and MMC client sites.",
 };
 function cleanPreferences(p: Preferences): Preferences {
   const categories: Preferences["categories"] = {};

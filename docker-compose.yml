@@ -51,6 +51,11 @@ services:
       CREDENTIALS_PREVIOUS_KEYS: ${CREDENTIALS_PREVIOUS_KEYS:-}
       # Optional joining-PDF size ceiling in MB; empty means no limit.
       MAX_JOINING_DOCUMENT_MB: ${MAX_JOINING_DOCUMENT_MB:-}
+      # MMC client SMS/WhatsApp via MSG91. Without the auth key, messages are logged as skipped.
+      MSG91_AUTH_KEY: ${MSG91_AUTH_KEY:-}
+      MSG91_SENDER_ID: ${MSG91_SENDER_ID:-}
+      MSG91_SMS_TEMPLATE_IDS: ${MSG91_SMS_TEMPLATE_IDS:-}
+      MSG91_WHATSAPP_NUMBER: ${MSG91_WHATSAPP_NUMBER:-}
     depends_on:
       migrate:
         condition: service_completed_successfully

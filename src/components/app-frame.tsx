@@ -36,6 +36,7 @@ import {
   MessageSquare,
   KeyRound,
   MapPinned,
+  ChevronDown,
 } from "lucide-react";
 import { modules, type Profile } from "@/lib/modules";
 import { roleLabel } from "@/lib/roles";
@@ -78,7 +79,7 @@ export function AppFrame({
   visible: string[];
   unread: number;
   /** Administrative areas this person may open; enforced again on each page. */
-  features?: { users: boolean; audit: boolean; permissions: boolean; chat: boolean; field?: boolean };
+  features?: { users: boolean; audit: boolean; permissions: boolean; chat: boolean; field?: boolean; mmc?: boolean; mmcSettings?: boolean };
 }) {
   const pathname = usePathname();
   const [mobile, setMobile] = useState(false);
@@ -93,6 +94,9 @@ export function AppFrame({
   const matchingModules = availableModules.filter((m) =>
     `${m.title} ${m.description} ${m.group}`.toLowerCase().includes(term),
   );
+  const showMmc =
+    Boolean(features.mmc) &&
+    "mmc maintenance charges client websites sites operations".includes(term);
   useEffect(() => {
     setMobile(false);
     setPageSearch("");
@@ -160,6 +164,57 @@ export function AppFrame({
       document.removeEventListener("pointerdown", unlockAlertSound);
     };
   }, []);
+  const [mmcOpen, setMmcOpen] = useState(() => pathname.startsWith("/mmc"));
+  useEffect(() => {
+    if (pathname.startsWith("/mmc")) setMmcOpen(true);
+  }, [pathname]);
+  const mmcPages: [string, string][] = [
+    ["/mmc", "Dashboard"],
+    ["/mmc/clients", "Clients"],
+    ["/mmc/payments", "Payments"],
+    ["/mmc/notifications", "Notifications"],
+    ["/mmc/notes", "Notes"],
+    ["/mmc/reports", "Reports"],
+    ["/mmc/integration", "Integration guide"],
+    ...(features.mmcSettings ? ([["/mmc/settings", "Settings"]] as [string, string][]) : []),
+  ];
+  /** MMC opens as a dropdown listing its pages. */
+  const mmcNav = () => {
+    const inside = pathname.startsWith("/mmc");
+    return (
+      <div key="mmc">
+        <button
+          type="button"
+          onClick={() => setMmcOpen((o) => !o)}
+          aria-expanded={mmcOpen}
+          aria-controls="mmc-subnav"
+          className={`group flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] transition-colors ${inside ? "font-semibold text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}
+        >
+          <IndianRupee size={17} strokeWidth={inside ? 2.25 : 2} />
+          <span className="flex-1 text-left">MMC</span>
+          <ChevronDown size={15} className={`transition-transform ${mmcOpen ? "rotate-180" : ""}`} />
+        </button>
+        {mmcOpen && (
+          <div id="mmc-subnav" className="ml-5 mt-0.5 space-y-0.5 border-l border-border pl-3">
+            {mmcPages.map(([href, label]) => {
+              const active = href === "/mmc" ? pathname === "/mmc" : pathname === href || pathname.startsWith(href + "/");
+              return (
+                <Link
+                  key={href}
+                  href={href}
+                  onClick={() => setMobile(false)}
+                  aria-current={active ? "page" : undefined}
+                  className={`block rounded-md px-3 py-2 text-[12.5px] transition-colors ${active ? "bg-primary/10 font-semibold text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}
+                >
+                  {label}
+                </Link>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  };
   const initials = profile.full_name
     .split(" ")
     .map((s) => s[0])
@@ -246,7 +301,7 @@ export function AppFrame({
         {["Business", "Work", "People", "Operations", "Finance"].map(
           (group) => {
             const list = matchingModules.filter((m) => m.group === group);
-            if (!list.length) return null;
+            if (!list.length && !(group === "Operations" && showMmc)) return null;
             return (
               <div key={group} className="mt-5">
                 <div className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-[.12em] text-muted-foreground/70">
@@ -260,6 +315,7 @@ export function AppFrame({
                     true,
                   ),
                 )}
+                {group === "Operations" && showMmc && mmcNav()}
               </div>
             );
           },
@@ -282,6 +338,7 @@ export function AppFrame({
         </div>
         {term &&
           !matchingModules.length &&
+          !showMmc &&
           ![
             "Overview",
             ...(features.field ? ["Field operations"] : []),

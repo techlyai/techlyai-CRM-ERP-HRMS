@@ -13,3 +13,4 @@ import "./rbac.test";
 import "./dev-accounts.test";
 import "./attendance-geo.test";
 import "./field.test";
+import "./mmc.test";

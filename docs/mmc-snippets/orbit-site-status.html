@@ -1,0 +1,32 @@
+<!-- Orbit MMC site switch — static HTML / React fallback.
+     Paste as the first script in <head>. Browser-only checks are easy to bypass
+     (anyone can disable JavaScript); use the PHP or Node version when you can.
+     The site key is visible in the page source, so set "Allowed domain" for this client. -->
+<script>
+(function () {
+  var ENDPOINT = "https://your-orbit-domain.example/api/site-status";
+  var KEY = "YOUR_SITE_KEY";
+  var CACHE = 'orbit-site-status';
+  var PAGE = "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><meta name=\"robots\" content=\"noindex\"><title>Site Suspended</title><style>body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#f6f5fb;color:#1d1b2c}main{max-width:440px;margin:24px;padding:36px 28px;background:#fff;border-radius:16px;box-shadow:0 10px 40px rgba(40,20,90,.08);text-align:center}h1{margin:0 0 12px;font-size:24px}p{line-height:1.6;color:#555}a{color:#552daa}</style></head><body><main><h1>Site Suspended</h1><p>Site suspended due to pending maintenance payment. Please contact admin.</p><p></p></main></body></html>";
+  function show(active) {
+    if (active) return;
+    document.open(); document.write(PAGE); document.close();
+  }
+  var cached = null;
+  try { cached = JSON.parse(localStorage.getItem(CACHE) || 'null'); } catch (e) {}
+  if (cached && Date.now() - cached.at < 300000) return show(cached.active);
+  if (cached) show(cached.active);
+  var ctrl = typeof AbortController === 'function' ? new AbortController() : null;
+  var timer = setTimeout(function () { if (ctrl) ctrl.abort(); }, 3000);
+  fetch(ENDPOINT, { headers: { 'x-site-key': KEY }, signal: ctrl && ctrl.signal })
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (j) {
+      if (!j || typeof j.active !== 'boolean') return; // fail open
+      try { localStorage.setItem(CACHE, JSON.stringify({ active: j.active, at: Date.now() })); } catch (e) {}
+      if (cached && !cached.active && j.active) location.reload();
+      else if (!cached || cached.active !== j.active) show(j.active);
+    })
+    .catch(function () {}) // fail open: keep last known status
+    .then(function () { clearTimeout(timer); });
+})();
+</script>

@@ -4,6 +4,7 @@ import { timingSafeEqual } from "node:crypto";
 import webpush from "web-push";
 import { serviceDB } from "@/lib/database";
 import { processEmailQueue } from "@/lib/email";
+import { processMmcMessages } from "@/lib/msg91";
 import type { Notification, Preferences } from "@/lib/notification-types";
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -28,6 +29,9 @@ export async function GET(req: NextRequest) {
     // Field sessions past their scheduled window stop accepting points; old field locations expire.
     const fieldClosed = await db.rpc<number>("field_close_expired");
     const fieldPurged = await db.rpc<number>("field_purge");
+    // MMC: dues, overdue, auto-suspend/reactivate and client reminders, then MSG91 delivery.
+    const mmcDues = await db.rpc<number>("mmc_tick");
+    const mmcMessages = await processMmcMessages(20);
     const email = await processEmailQueue(20);
     let sent = 0;
     let failed = 0;
@@ -131,6 +135,8 @@ export async function GET(req: NextRequest) {
       field_sessions_closed: fieldClosed,
       field_points_purged: fieldPurged,
       email,
+      mmc_dues_generated: mmcDues,
+      mmc_messages: mmcMessages,
       push_sent: sent,
       push_failed: failed,
     });

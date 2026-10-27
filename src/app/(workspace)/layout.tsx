@@ -46,6 +46,8 @@ export default async function WorkspaceLayout({
           fieldEmployee ||
           can(profile, permissions, "field", "view") ||
           can(profile, permissions, "field", "manage"),
+        mmc: can(profile, permissions, "mmc", "view"),
+        mmcSettings: can(profile, permissions, "mmc", "settings"),
       }}
     >
       {children}

@@ -44,4 +44,5 @@ export const notificationCategories: { key: string; label: string; group: string
   { key: "field", label: "Field operations & GPS photos", group: "Work" },
   { key: "maintenance", label: "Asset maintenance", group: "Operations" },
   { key: "stock", label: "Low stock", group: "Operations" },
+  { key: "mmc", label: "MMC: payments, overdue clients & site switches", group: "Operations" },
 ];

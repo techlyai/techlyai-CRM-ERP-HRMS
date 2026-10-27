@@ -11,6 +11,8 @@ Next.js App Router + TypeScript business management platform using **standalone 
 
 Twenty modules cover CRM, renewals, HRIS, attendance, EOD reports, leave, projects, inventory, assets, purchases, expenses, and finance. Backend workflow functions and PostgreSQL RLS enforce record access and transactional approvals.
 
+**MMC** (Operations → MMC) tracks each website client's monthly maintenance charge and switches their site ON/OFF through a small snippet; see [docs/MMC.md](docs/MMC.md).
+
 Start with [docs/SETUP.md](docs/SETUP.md). The database structure is documented in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md); current limits and verification are in [docs/STATUS.md](docs/STATUS.md).
 
 ```powershell
