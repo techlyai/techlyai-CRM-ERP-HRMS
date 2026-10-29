@@ -14,7 +14,7 @@ export default async function MmcClientsPage({ searchParams }: { searchParams?: 
         <p className="text-sm text-muted-foreground">{clients.length} clients · {clients.filter((c) => !c.site_active).length} suspended</p>
         {a.manage && <ClientFormButton client={null} defaultGrace={settings?.default_grace_days ?? 5} />}
       </div>
-      <ClientList clients={clients} manage={a.manage} canDelete={a.delete} initialFilter={searchParams?.filter} />
+      <ClientList clients={clients} manage={a.manage} canDelete={a.delete} enabled={Object.entries(settings?.templates || {}).filter(([, t]) => t.enabled).map(([k]) => k)} initialFilter={searchParams?.filter} />
     </div>
   );
 }
