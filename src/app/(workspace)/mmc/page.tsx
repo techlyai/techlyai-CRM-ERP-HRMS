@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { AlertTriangle, CalendarClock, Globe, IndianRupee, PowerOff, Users } from "lucide-react";
 import { context } from "@/lib/database";
-import { dashboardData, listClients, mmcAbilities, pendingClaims } from "@/lib/mmc-data";
+import { dashboardData, listClients, mmcAbilities, mmcSettings, pendingClaims } from "@/lib/mmc-data";
 import { ClaimList } from "@/components/mmc/claims";
 import { daysBetween, rupees } from "@/lib/mmc";
 import { localDate } from "@/lib/domain";
@@ -11,7 +11,8 @@ export const dynamic = "force-dynamic";
 
 export default async function MmcDashboard() {
   const { db, profile } = await context();
-  const [a, clients, d, claims] = await Promise.all([mmcAbilities(db, profile), listClients(db), dashboardData(db), pendingClaims(db)]);
+  const [a, clients, d, claims, settings] = await Promise.all([mmcAbilities(db, profile), listClients(db), dashboardData(db), pendingClaims(db), mmcSettings(db)]);
+  const enabled = Object.entries(settings?.templates || {}).filter(([, t]) => t.enabled).map(([k]) => k);
   const today = localDate();
   const overdue = clients.filter((c) => c.status === "Overdue").sort((x, y) => y.days_overdue - x.days_overdue);
   const upcoming = clients
@@ -76,7 +77,7 @@ export default async function MmcDashboard() {
                     <div className="text-[11px] text-danger">{c.days_overdue} days overdue · {rupees(c.owed)}</div>
                   </div>
                   {a.manage && <PayButton client={c.id} name={c.name} owed={c.owed} amount={c.mmc_amount} />}
-                  {a.manage && <RemindButton client={c.id} />}
+                  {a.manage && <RemindButton client={c.id} enabled={enabled} />}
                   <SiteToggle client={c.id} name={c.name} active={c.site_active} disabled={!a.manage} />
                 </li>
               ))}

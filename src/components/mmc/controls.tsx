@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { BellRing, IndianRupee, Loader2 } from "lucide-react";
 import { recordMmcPayment, sendMmcReminder, setMmcSite } from "@/lib/mmc-actions";
-import { paymentModes, rupees } from "@/lib/mmc";
+import { mmcEvents, paymentModes, rupees } from "@/lib/mmc";
 import { Button } from "../ui/button";
 import { Dialog, DialogContent } from "../ui/dialog";
 
@@ -139,23 +139,48 @@ export function PayButton({ client, name, owed, amount, size = "sm" }: { client:
   );
 }
 
-export function RemindButton({ client, size = "sm" }: { client: string; size?: "sm" | "default" }) {
+export function RemindButton({ client, enabled, size = "sm" }: { client: string; enabled: string[]; size?: "sm" | "default" }) {
   const router = useRouter();
+  const [open, setOpen] = useState(false);
   const [state, setState] = useState<"" | "busy" | "done" | string>("");
-  async function send() {
+  async function send(template: string) {
     setState("busy");
-    const r = await sendMmcReminder(client);
+    const r = await sendMmcReminder(client, template);
     if (!r.ok) return setState(r.error || "Failed");
     const res = r.data?.result;
-    setState(!r.data?.queued ? "Nothing sent (channel off or template disabled)" : res && res.sent ? "Sent" : res && res.skipped ? "Logged (MSG91 not configured)" : res && res.failed ? "Failed, will retry" : "Queued");
+    setState(!r.data?.queued ? "Nothing sent (client notifications are off)" : res && res.sent ? "Sent" : res && res.skipped ? "Logged (MSG91 not configured)" : res && res.failed ? "Failed, will retry" : "Queued");
     router.refresh();
   }
   return (
-    <span className="inline-flex items-center gap-2">
-      <Button size={size} variant="outline" disabled={state === "busy"} onClick={send}>
-        {state === "busy" ? <Loader2 size={14} className="animate-spin" /> : <BellRing size={14} />} Remind
+    <>
+      <Button size={size} variant="outline" onClick={() => { setState(""); setOpen(true); }}>
+        <BellRing size={14} /> Remind
       </Button>
-      {state && state !== "busy" && <span className="text-[11px] text-muted-foreground">{state}</span>}
-    </span>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent title="Send a WhatsApp message" description="Choose the message to send to this client now.">
+          <div className="mt-4 space-y-2">
+            {mmcEvents.map((ev) => {
+              const on = enabled.includes(ev.key);
+              return (
+                <button
+                  key={ev.key}
+                  disabled={!on || state === "busy"}
+                  onClick={() => send(ev.key)}
+                  className="flex w-full items-center justify-between rounded-lg border border-border px-3 py-2.5 text-left text-sm hover:border-primary/40 hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
+                >
+                  <span>{ev.label}</span>
+                  <span className="text-[11px] text-muted-foreground">{on ? "Send" : "Off in Settings"}</span>
+                </button>
+              );
+            })}
+          </div>
+          {state && (
+            <p className={`mt-3 text-xs ${state === "Sent" ? "text-success" : "text-muted-foreground"}`}>
+              {state === "busy" ? <Loader2 size={14} className="inline animate-spin" /> : state}
+            </p>
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

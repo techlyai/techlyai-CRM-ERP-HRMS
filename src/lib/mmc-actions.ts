@@ -170,10 +170,12 @@ export async function deleteMmcClient(id: string) {
   });
 }
 
-export async function sendMmcReminder(clientId: string) {
+export async function sendMmcReminder(clientId: string, template?: string) {
   return guard(async () => {
     const { db } = await context();
-    const queued = await db.rpc<number>("mmc_send_reminder", { p_client: uuid.parse(clientId) });
+    const queued = template
+      ? await db.rpc<number>("mmc_send_message", { p_client: uuid.parse(clientId), p_template: z.enum(["reminder", "due_today", "overdue", "suspended", "reactivated", "payment_received"]).parse(template) })
+      : await db.rpc<number>("mmc_send_reminder", { p_client: uuid.parse(clientId) });
     // Deliver right away instead of waiting for the next scheduler tick.
     const { processMmcMessages } = await import("./msg91");
     const result = await processMmcMessages(10).catch(() => null);

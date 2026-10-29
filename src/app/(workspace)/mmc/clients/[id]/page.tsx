@@ -65,7 +65,7 @@ export default async function MmcClientPage({ params }: { params: { id: string }
         </div>
         <div className="mt-4 flex flex-wrap items-center gap-2">
           {a.manage && <PayButton client={c.id} name={c.name} owed={c.owed} amount={c.mmc_amount} size="default" />}
-          {a.manage && <RemindButton client={c.id} size="default" />}
+          {a.manage && <RemindButton client={c.id} size="default" enabled={Object.entries(settings?.templates || {}).filter(([, t]) => t.enabled).map(([k]) => k)} />}
           {a.manage && <ClientFormButton client={c} />}
           {a.delete && <DeleteClientButton client={c.id} name={c.name} />}
           <span className="ml-auto text-[11px] text-muted-foreground">
