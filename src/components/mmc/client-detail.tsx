@@ -180,7 +180,9 @@ export function DeleteClientButton({ client, name }: { client: string; name: str
                   const r = await deleteMmcClient(client);
                   setBusy(false);
                   if (!r.ok) return setError(r.error || "Could not delete");
+                  setOpen(false);
                   router.push("/mmc/clients");
+                  router.refresh();
                 }}
               >
                 Delete client

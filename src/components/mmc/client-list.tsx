@@ -1,14 +1,16 @@
 "use client";
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Search } from "lucide-react";
+import { Eye, Search } from "lucide-react";
 import { lastSeen, rupees } from "@/lib/mmc";
 import type { ClientRow } from "@/lib/mmc-data";
 import { DueBadge, PayButton, SiteToggle } from "./controls";
+import { ClientFormButton } from "./client-form";
+import { DeleteClientButton } from "./client-detail";
 
 const filters = ["All", "Paid", "Pending", "Overdue", "Active", "Suspended"] as const;
 
-export function ClientList({ clients, manage, initialFilter }: { clients: ClientRow[]; manage: boolean; initialFilter?: string }) {
+export function ClientList({ clients, manage, canDelete, initialFilter }: { clients: ClientRow[]; manage: boolean; canDelete: boolean; initialFilter?: string }) {
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<(typeof filters)[number]>(
     (filters as readonly string[]).includes(initialFilter || "") ? (initialFilter as (typeof filters)[number]) : "All",
@@ -49,7 +51,7 @@ export function ClientList({ clients, manage, initialFilter }: { clients: Client
         <p className="p-8 text-center text-sm text-muted-foreground">{clients.length ? "No clients match this filter." : "No MMC clients yet. Add your first client to get a site key."}</p>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px] text-left text-xs">
+          <table className="w-full min-w-[980px] text-left text-xs">
             <thead className="bg-muted/40 text-muted-foreground">
               <tr>
                 {["Client", "MMC", "This month", "Outstanding", "Site last seen", "Site", ""].map((h) => (
@@ -77,7 +79,16 @@ export function ClientList({ clients, manage, initialFilter }: { clients: Client
                   <td className="p-3">
                     <SiteToggle client={c.id} name={c.name} active={c.site_active} disabled={!manage} />
                   </td>
-                  <td className="p-3 text-right">{manage && <PayButton client={c.id} name={c.name} owed={c.owed} amount={c.mmc_amount} />}</td>
+                  <td className="p-3">
+                    <div className="flex items-center justify-end gap-1">
+                      {manage && <PayButton client={c.id} name={c.name} owed={c.owed} amount={c.mmc_amount} />}
+                      <Link href={`/mmc/clients/${c.id}`} aria-label={`View ${c.name}`} className="inline-flex h-8 items-center gap-1 rounded-lg px-2 text-xs text-muted-foreground hover:bg-muted hover:text-foreground">
+                        <Eye size={14} /> View
+                      </Link>
+                      {manage && <ClientFormButton client={c} />}
+                      {canDelete && <DeleteClientButton client={c.id} name={c.name} />}
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
