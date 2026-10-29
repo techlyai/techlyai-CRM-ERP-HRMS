@@ -175,7 +175,6 @@ export function AppFrame({
     ["/mmc/notifications", "Notifications"],
     ["/mmc/notes", "Notes"],
     ["/mmc/reports", "Reports"],
-    ["/mmc/integration", "Integration guide"],
     ...(features.mmcSettings ? ([["/mmc/settings", "Settings"]] as [string, string][]) : []),
   ];
   /** MMC opens as a dropdown listing its pages. */
