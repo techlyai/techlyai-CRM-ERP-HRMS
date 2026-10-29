@@ -5,6 +5,7 @@ import { rupees, upiLink } from "@/lib/mmc";
 import { Logo } from "@/components/logo";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { PaymentClaimForm } from "@/components/mmc/pay-form";
+import { UpiAppButtons } from "@/components/mmc/upi-apps";
 
 export const dynamic = "force-dynamic";
 export const metadata = {
@@ -57,7 +58,8 @@ export default async function PayPage({ params }: { params: { token: string } })
               <a href={link} className="flex h-12 w-full items-center justify-center rounded-lg bg-primary text-sm font-semibold text-primary-foreground shadow-sm">
                 Pay {rupees(amount)} with UPI app
               </a>
-              <p className="text-center text-[11px] text-muted-foreground">Opens Google Pay, PhonePe, Paytm or your bank app on this phone.</p>
+              <p className="text-center text-[11px] text-muted-foreground">Opens Google Pay, PhonePe, Paytm or your bank app on this phone. Or choose an app:</p>
+              <UpiAppButtons link={link} />
               <div className="flex flex-col items-center gap-2">
                 <div className="rounded-xl bg-white p-2" dangerouslySetInnerHTML={{ __html: qr }} />
                 <p className="text-[11px] text-muted-foreground">Or scan with any UPI app · UPI ID <span className="font-mono">{vpa}</span></p>
