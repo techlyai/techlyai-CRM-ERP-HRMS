@@ -18,6 +18,11 @@ export const KEY_PLACEHOLDER = "YOUR_SITE_KEY";
 
 const esc = (s: string) =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+/** Digits with the India code added to a 10-digit number, for tel: and wa.me links. */
+const intl = (s: string) => {
+  const d = s.replace(/\D/g, "");
+  return d.length === 10 ? "91" + d : d;
+};
 const single = (s: string) => s.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
 
 /** The static "Site Suspended" page every snippet serves with HTTP 503. */
@@ -25,8 +30,8 @@ export function suspendedPage(i: SnippetInput): string {
   const c = i.contact;
   const lines = [
     c.name && `<strong>${esc(c.name)}</strong>`,
-    c.phone && `Phone: <a href="tel:${esc(c.phone)}">${esc(c.phone)}</a>`,
-    c.whatsapp && `WhatsApp: <a href="https://wa.me/${esc(c.whatsapp.replace(/\D/g, ""))}">${esc(c.whatsapp)}</a>`,
+    c.phone && `Phone: <a href="tel:+${intl(c.phone)}">${esc(c.phone)}</a>`,
+    c.whatsapp && `WhatsApp: <a href="https://wa.me/${intl(c.whatsapp)}">${esc(c.whatsapp)}</a>`,
     c.email && `Email: <a href="mailto:${esc(c.email)}">${esc(c.email)}</a>`,
   ].filter(Boolean);
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>${esc(i.title)}</title><style>body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#f6f5fb;color:#1d1b2c}main{max-width:440px;margin:24px;padding:36px 28px;background:#fff;border-radius:16px;box-shadow:0 10px 40px rgba(40,20,90,.08);text-align:center}h1{margin:0 0 12px;font-size:24px}p{line-height:1.6;color:#555}a{color:#552daa}</style></head><body><main><h1>${esc(i.title)}</h1><p>${esc(i.message)}</p><p>${lines.join("<br>")}</p></main></body></html>`;
